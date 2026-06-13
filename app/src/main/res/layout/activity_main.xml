@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0D0D0D">
+
+    <LinearLayout
+        android:id="@+id/navBar"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:background="#1A1A2E"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:elevation="8dp">
+
+        <Button
+            android:id="@+id/btnYoutube"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="&#9654; YouTube"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:background="@drawable/btn_primary"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:focusable="true" />
+
+        <EditText
+            android:id="@+id/urlBar"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/url_bar_bg"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#888888"
+            android:hint="Escribe una URL..."
+            android:textSize="14sp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:singleLine="true"
+            android:imeOptions="actionGo"
+            android:inputType="textUri"
+            android:focusable="true" />
+
+        <Button
+            android:id="@+id/btnBack"
+            android:layout_width="52dp"
+            android:layout_height="48dp"
+            android:text="&#9664;"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:background="@drawable/btn_nav"
+            android:focusable="true" />
+
+        <Button
+            android:id="@+id/btnForward"
+            android:layout_width="52dp"
+            android:layout_height="48dp"
+            android:text="&#9654;"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:background="@drawable/btn_nav"
+            android:layout_marginStart="6dp"
+            android:focusable="true" />
+
+        <Button
+            android:id="@+id/btnRefresh"
+            android:layout_width="52dp"
+            android:layout_height="48dp"
+            android:text="&#8635;"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:background="@drawable/btn_nav"
+            android:layout_marginStart="6dp"
+            android:focusable="true" />
+
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_below="@id/navBar"
+        android:progressTint="#FF6B35"
+        android:visibility="gone" />
+
+    <WebView
+        android:id="@+id/webView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/navBar"
+        android:focusable="true"
+        android:focusableInTouchMode="true" />
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:text=""
+        android:textColor="#44FFFFFF"
+        android:textSize="10sp"
+        android:padding="4dp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/fullscreenContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:orientation="vertical"
+        android:visibility="gone" />
+
+</RelativeLayout>
