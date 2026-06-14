@@ -11,20 +11,20 @@
         android:background="#1A1A2E"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
         android:elevation="8dp">
 
         <Button
             android:id="@+id/btnYoutube"
             android:layout_width="wrap_content"
             android:layout_height="48dp"
-            android:text="&#9654; YouTube"
+            android:text="&#9654; YT"
             android:textColor="#FFFFFF"
-            android:textSize="16sp"
+            android:textSize="14sp"
             android:background="@drawable/btn_primary"
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
             android:focusable="true" />
 
         <EditText
@@ -32,50 +32,64 @@
             android:layout_width="0dp"
             android:layout_height="44dp"
             android:layout_weight="1"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
             android:background="@drawable/url_bar_bg"
             android:textColor="#FFFFFF"
             android:textColorHint="#888888"
             android:hint="Escribe una URL..."
-            android:textSize="14sp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
+            android:textSize="13sp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
             android:singleLine="true"
             android:imeOptions="actionGo"
             android:inputType="textUri"
             android:focusable="true" />
 
+        <!-- Selector de región (bypass geográfico) -->
+        <Button
+            android:id="@+id/btnRegion"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="&#127758; Auto"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:background="@drawable/btn_nav"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:focusable="true" />
+
         <Button
             android:id="@+id/btnBack"
-            android:layout_width="52dp"
+            android:layout_width="48dp"
             android:layout_height="48dp"
             android:text="&#9664;"
             android:textColor="#FFFFFF"
             android:textSize="18sp"
             android:background="@drawable/btn_nav"
+            android:layout_marginStart="5dp"
             android:focusable="true" />
 
         <Button
             android:id="@+id/btnForward"
-            android:layout_width="52dp"
+            android:layout_width="48dp"
             android:layout_height="48dp"
             android:text="&#9654;"
             android:textColor="#FFFFFF"
             android:textSize="18sp"
             android:background="@drawable/btn_nav"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="5dp"
             android:focusable="true" />
 
         <Button
             android:id="@+id/btnRefresh"
-            android:layout_width="52dp"
+            android:layout_width="48dp"
             android:layout_height="48dp"
             android:text="&#8635;"
             android:textColor="#FFFFFF"
             android:textSize="22sp"
             android:background="@drawable/btn_nav"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="5dp"
             android:focusable="true" />
 
     </LinearLayout>
