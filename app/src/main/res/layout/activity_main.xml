@@ -7,30 +7,32 @@
     <LinearLayout
         android:id="@+id/navBar"
         android:layout_width="match_parent"
-        android:layout_height="72dp"
+        android:layout_height="68dp"
         android:background="#1A1A2E"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
         android:elevation="8dp">
 
+        <!-- YouTube home -->
         <Button
             android:id="@+id/btnYoutube"
             android:layout_width="wrap_content"
-            android:layout_height="48dp"
+            android:layout_height="46dp"
             android:text="&#9654; YT"
             android:textColor="#FFFFFF"
             android:textSize="14sp"
             android:background="@drawable/btn_primary"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             android:focusable="true" />
 
+        <!-- Barra de URL -->
         <EditText
             android:id="@+id/urlBar"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="42dp"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="8dp"
@@ -38,56 +40,59 @@
             android:textColor="#FFFFFF"
             android:textColorHint="#888888"
             android:hint="Escribe una URL..."
-            android:textSize="13sp"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
+            android:textSize="12sp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             android:singleLine="true"
             android:imeOptions="actionGo"
             android:inputType="textUri"
             android:focusable="true" />
 
-        <!-- Selector de región (bypass geográfico) -->
+        <!-- VPN AUTO (toca = on/off, mantén = elegir región) -->
         <Button
-            android:id="@+id/btnRegion"
+            android:id="@+id/btnVpn"
             android:layout_width="wrap_content"
-            android:layout_height="48dp"
+            android:layout_height="46dp"
             android:text="&#127758; Auto"
             android:textColor="#FFFFFF"
-            android:textSize="12sp"
-            android:background="@drawable/btn_nav"
+            android:textSize="11sp"
+            android:background="@drawable/btn_vpn"
             android:paddingStart="10dp"
             android:paddingEnd="10dp"
             android:focusable="true" />
 
+        <!-- Atrás -->
         <Button
             android:id="@+id/btnBack"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
             android:text="&#9664;"
             android:textColor="#FFFFFF"
-            android:textSize="18sp"
+            android:textSize="17sp"
             android:background="@drawable/btn_nav"
             android:layout_marginStart="5dp"
             android:focusable="true" />
 
+        <!-- Adelante -->
         <Button
             android:id="@+id/btnForward"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
             android:text="&#9654;"
             android:textColor="#FFFFFF"
-            android:textSize="18sp"
+            android:textSize="17sp"
             android:background="@drawable/btn_nav"
             android:layout_marginStart="5dp"
             android:focusable="true" />
 
+        <!-- Recargar -->
         <Button
             android:id="@+id/btnRefresh"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
             android:text="&#8635;"
             android:textColor="#FFFFFF"
-            android:textSize="22sp"
+            android:textSize="21sp"
             android:background="@drawable/btn_nav"
             android:layout_marginStart="5dp"
             android:focusable="true" />
