@@ -343,9 +343,41 @@ public class MainActivity extends Activity {
         webView.requestFocus();
     }
 
+    /** Abre un diálogo para buscar directamente en YouTube. */
+    private void showSearchDialog() {
+        final EditText input = new EditText(this);
+        input.setHint("Buscar en YouTube...");
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        input.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(this)
+            .setTitle("🔍 Buscar en YouTube")
+            .setView(input)
+            .setPositiveButton("Buscar", (d, w) -> doYoutubeSearch(input.getText().toString()))
+            .setNegativeButton("Cancelar", null)
+            .create();
+
+        input.setOnEditorActionListener((v, actionId, event) -> {
+            doYoutubeSearch(input.getText().toString());
+            dialog.dismiss();
+            return true;
+        });
+
+        dialog.show();
+        input.requestFocus();
+    }
+
+    private void doYoutubeSearch(String query) {
+        query = query == null ? "" : query.trim();
+        if (query.isEmpty()) return;
+        String url = "https://www.youtube.com/results?search_query=" + Uri.encode(query);
+        loadUrl(applyRegion(url));
+    }
+
     private void setupButtons() {
         findViewById(R.id.btnYoutube).setOnClickListener(v ->
             loadUrl(applyRegion("https://www.youtube.com/tv")));
+        findViewById(R.id.btnSearch).setOnClickListener(v -> showSearchDialog());
         findViewById(R.id.btnBack).setOnClickListener(v -> {
             if (webView.canGoBack()) webView.goBack();
         });
@@ -402,6 +434,10 @@ public class MainActivity extends Activity {
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
             webView.goBack();
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_SEARCH) {
+            showSearchDialog();
             return true;
         }
         return super.onKeyDown(keyCode, event);

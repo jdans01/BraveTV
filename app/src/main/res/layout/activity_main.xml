@@ -26,7 +26,22 @@
             android:background="@drawable/btn_primary"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
-            android:focusable="true" />
+            android:focusable="true"
+            android:nextFocusRight="@id/btnSearch" />
+
+        <!-- Búsqueda rápida de YouTube -->
+        <Button
+            android:id="@+id/btnSearch"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:text="&#128269;"
+            android:textColor="#FFFFFF"
+            android:textSize="17sp"
+            android:background="@drawable/btn_nav"
+            android:layout_marginStart="5dp"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnYoutube"
+            android:nextFocusRight="@id/urlBar" />
 
         <!-- Barra de URL -->
         <EditText
@@ -46,7 +61,9 @@
             android:singleLine="true"
             android:imeOptions="actionGo"
             android:inputType="textUri"
-            android:focusable="true" />
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnSearch"
+            android:nextFocusRight="@id/btnVpn" />
 
         <!-- VPN AUTO (toca = on/off, mantén = elegir región) -->
         <Button
@@ -59,7 +76,9 @@
             android:background="@drawable/btn_vpn"
             android:paddingStart="10dp"
             android:paddingEnd="10dp"
-            android:focusable="true" />
+            android:focusable="true"
+            android:nextFocusLeft="@id/urlBar"
+            android:nextFocusRight="@id/btnBack" />
 
         <!-- Atrás -->
         <Button
@@ -71,7 +90,9 @@
             android:textSize="17sp"
             android:background="@drawable/btn_nav"
             android:layout_marginStart="5dp"
-            android:focusable="true" />
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnVpn"
+            android:nextFocusRight="@id/btnForward" />
 
         <!-- Adelante -->
         <Button
@@ -83,7 +104,9 @@
             android:textSize="17sp"
             android:background="@drawable/btn_nav"
             android:layout_marginStart="5dp"
-            android:focusable="true" />
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnBack"
+            android:nextFocusRight="@id/btnRefresh" />
 
         <!-- Recargar -->
         <Button
@@ -95,7 +118,9 @@
             android:textSize="21sp"
             android:background="@drawable/btn_nav"
             android:layout_marginStart="5dp"
-            android:focusable="true" />
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnForward"
+            android:nextFocusDown="@id/webView" />
 
     </LinearLayout>
 
