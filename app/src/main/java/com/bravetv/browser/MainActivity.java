@@ -42,6 +42,9 @@ public class MainActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private boolean navBarHidden = false;
+    private int blockedCount = 0;
+    private TextView btnBlockCount;
+    private TextView homeBlockCount;
 
     // ─── Regiones ─────────────────────────────────────────────────────────────
     private static final String[] AUTO_REGIONS = {
@@ -321,8 +324,10 @@ public class MainActivity extends Activity {
         navBar        = findViewById(R.id.navBar);
         btnVpn        = findViewById(R.id.btnVpn);
         homeScreen    = findViewById(R.id.homeScreen);
-        homeVpnStatus = findViewById(R.id.homeVpnStatus);
-        recentsList   = findViewById(R.id.recentsList);
+        homeVpnStatus  = findViewById(R.id.homeVpnStatus);
+        recentsList    = findViewById(R.id.recentsList);
+        btnBlockCount  = findViewById(R.id.btnBlockCount);
+        homeBlockCount = findViewById(R.id.homeBlockCount);
 
         prefs = getSharedPreferences("bravetv", 0); // Context.MODE_PRIVATE = 0
         autoVpnEnabled = prefs.getBoolean("vpn", true);
@@ -406,9 +411,12 @@ public class MainActivity extends Activity {
 
         String url;
         switch (mode) {
+            case NAV_BRAVE:
+                url = "https://search.brave.com/";
+                break;
             case NAV_INCOGNITO:
                 clearBrowsingData();
-                url = applyRegion("https://www.youtube.com/tv");
+                url = "https://duckduckgo.com/";
                 break;
             case NAV_YT_TV:
                 url = applyRegion("https://www.youtube.com/tv");
@@ -419,7 +427,7 @@ public class MainActivity extends Activity {
                     : "https://www.youtube.com/";
                 break;
             default:
-                url = applyRegion("https://www.youtube.com/tv");
+                url = "https://search.brave.com/";
                 break;
         }
 
@@ -479,9 +487,17 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
-                if (isAdUrl(req.getUrl().toString()))
+                if (isAdUrl(req.getUrl().toString())) {
+                    blockedCount++;
+                    handler.post(() -> {
+                        if (btnBlockCount != null)
+                            btnBlockCount.setText("🚫 " + blockedCount);
+                        if (homeBlockCount != null)
+                            homeBlockCount.setText("🚫 " + blockedCount + " bloqueados");
+                    });
                     return new WebResourceResponse("text/plain", "utf-8",
                         new java.io.ByteArrayInputStream("".getBytes()));
+                }
                 return super.shouldInterceptRequest(view, req);
             }
 
