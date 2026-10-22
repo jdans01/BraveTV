@@ -22,12 +22,12 @@ import java.util.*;
 
 public class MainActivity extends Activity {
 
-    private static final int MODE_BRAVE   = 0;
-    private static final int MODE_PRIVATE = 1;
-    private static final int MODE_YT_TV   = 2;
-    private static final int MODE_YT_WEB  = 3;
+    private static final int NAV_BRAVE     = 0;
+    private static final int NAV_INCOGNITO = 1;
+    private static final int NAV_YT_TV    = 2;
+    private static final int NAV_YT_WEB   = 3;
 
-    private int currentMode = MODE_BRAVE;
+    private int currentMode = NAV_BRAVE;
 
     private WebView webView;
     private EditText urlBar;
@@ -106,7 +106,7 @@ public class MainActivity extends Activity {
     }
 
     private void applyRegionCookies() {
-        if (!autoVpnEnabled || currentMode == MODE_PRIVATE) return;
+        if (!autoVpnEnabled || currentMode == NAV_INCOGNITO) return;
         String gl = AUTO_REGIONS[regionIndex];
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
@@ -288,9 +288,9 @@ public class MainActivity extends Activity {
 
         String finalUrl = url;
         card.setOnClickListener(v -> {
-            currentMode = MODE_BRAVE;
+            currentMode = NAV_BRAVE;
             showBrowser();
-            configureWebViewForMode(MODE_BRAVE);
+            configureWebViewForMode(NAV_BRAVE);
             applyRegionCookies();
             updateVpnButton();
             loadUrl(applyRegion(finalUrl));
@@ -324,7 +324,7 @@ public class MainActivity extends Activity {
         homeVpnStatus = findViewById(R.id.homeVpnStatus);
         recentsList   = findViewById(R.id.recentsList);
 
-        prefs = getSharedPreferences("bravetv", MODE_PRIVATE);
+        prefs = getSharedPreferences("bravetv", 0); // Context.MODE_PRIVATE = 0
         autoVpnEnabled = prefs.getBoolean("vpn", true);
         regionIndex    = prefs.getInt("regionIdx", 0);
 
@@ -406,14 +406,14 @@ public class MainActivity extends Activity {
 
         String url;
         switch (mode) {
-            case MODE_PRIVATE:
+            case NAV_INCOGNITO:
                 clearBrowsingData();
                 url = applyRegion("https://www.youtube.com/tv");
                 break;
-            case MODE_YT_TV:
+            case NAV_YT_TV:
                 url = applyRegion("https://www.youtube.com/tv");
                 break;
-            case MODE_YT_WEB:
+            case NAV_YT_WEB:
                 url = autoVpnEnabled
                     ? "https://www.youtube.com/?gl=" + AUTO_REGIONS[regionIndex] + "&hl=es"
                     : "https://www.youtube.com/";
@@ -431,12 +431,12 @@ public class MainActivity extends Activity {
 
     private void configureWebViewForMode(int mode) {
         WebSettings s = webView.getSettings();
-        if (mode == MODE_PRIVATE) {
+        if (mode == NAV_INCOGNITO) {
             s.setUserAgentString(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
             CookieManager.getInstance().setAcceptCookie(false);
-        } else if (mode == MODE_YT_WEB) {
+        } else if (mode == NAV_YT_WEB) {
             s.setUserAgentString(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
@@ -491,7 +491,7 @@ public class MainActivity extends Activity {
                 super.onReceivedHttpError(view, req, resp);
                 if (resp != null && resp.getStatusCode() == 403) {
                     String url = req.getUrl().toString();
-                    if (url.contains("youtube.com") && !isAdUrl(url) && currentMode != MODE_PRIVATE)
+                    if (url.contains("youtube.com") && !isAdUrl(url) && currentMode != NAV_INCOGNITO)
                         onGeoBlockDetected("http_403");
                 }
             }
@@ -534,14 +534,14 @@ public class MainActivity extends Activity {
                     "var v=document.querySelector('video');if(v)v.currentTime=v.duration;}},300);", null);
 
                 // Region cookie
-                if (autoVpnEnabled && currentMode != MODE_PRIVATE) {
+                if (autoVpnEnabled && currentMode != NAV_INCOGNITO) {
                     String gl = AUTO_REGIONS[regionIndex];
                     view.evaluateJavascript(
                         "document.cookie='PREF=f6=8&gl=" + gl + "; domain=.youtube.com; path=/';", null);
                 }
 
                 // Geo-block detector
-                if (currentMode != MODE_PRIVATE) {
+                if (currentMode != NAV_INCOGNITO) {
                     view.evaluateJavascript(
                         "(function(){var kw=['country','región','region','not available'," +
                         "'tu país','disponible','restricted','blocked'];" +
@@ -573,7 +573,7 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
                 String url = req.getUrl().toString();
-                view.loadUrl(currentMode != MODE_PRIVATE ? applyRegion(url) : url);
+                view.loadUrl(currentMode != NAV_INCOGNITO ? applyRegion(url) : url);
                 return true;
             }
         });
@@ -609,13 +609,13 @@ public class MainActivity extends Activity {
 
     // ─── Buttons ──────────────────────────────────────────────────────────────
     private void setupButtons() {
-        findViewById(R.id.cardBrave).setOnClickListener(v -> launchMode(MODE_BRAVE));
-        findViewById(R.id.cardTor).setOnClickListener(v -> launchMode(MODE_PRIVATE));
-        findViewById(R.id.cardYtTv).setOnClickListener(v -> launchMode(MODE_YT_TV));
-        findViewById(R.id.cardYtWeb).setOnClickListener(v -> launchMode(MODE_YT_WEB));
+        findViewById(R.id.cardBrave).setOnClickListener(v -> launchMode(NAV_BRAVE));
+        findViewById(R.id.cardTor).setOnClickListener(v -> launchMode(NAV_INCOGNITO));
+        findViewById(R.id.cardYtTv).setOnClickListener(v -> launchMode(NAV_YT_TV));
+        findViewById(R.id.cardYtWeb).setOnClickListener(v -> launchMode(NAV_YT_WEB));
 
         findViewById(R.id.btnYoutube).setOnClickListener(v ->
-            loadUrl(currentMode == MODE_YT_WEB
+            loadUrl(currentMode == NAV_YT_WEB
                 ? "https://www.youtube.com/" : applyRegion("https://www.youtube.com/tv")));
         findViewById(R.id.btnSearch).setOnClickListener(v -> showSearchDialog());
         findViewById(R.id.btnBack).setOnClickListener(v -> {
