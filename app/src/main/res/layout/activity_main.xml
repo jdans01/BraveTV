@@ -4,9 +4,7 @@
     android:layout_height="match_parent"
     android:background="#0D0D0D">
 
-    <!-- ╔══════════════════════════════════════════════════════╗ -->
-    <!-- ║  BARRA DE NAVEGACIÓN (visible en modo navegador)    ║ -->
-    <!-- ╚══════════════════════════════════════════════════════╝ -->
+    <!-- NAV BAR -->
     <LinearLayout
         android:id="@+id/navBar"
         android:layout_width="match_parent"
@@ -117,6 +115,7 @@
             android:layout_marginStart="5dp"
             android:focusable="true"
             android:nextFocusLeft="@id/btnForward"
+            android:nextFocusRight="@id/btnHome"
             android:nextFocusDown="@id/webView" />
 
         <Button
@@ -171,271 +170,224 @@
         android:orientation="vertical"
         android:visibility="gone" />
 
-    <!-- ╔══════════════════════════════════════════════════════╗ -->
-    <!-- ║  PANTALLA DE INICIO                                  ║ -->
-    <!-- ╚══════════════════════════════════════════════════════╝ -->
-    <RelativeLayout
+    <!-- HOME SCREEN -->
+    <ScrollView
         android:id="@+id/homeScreen"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#0D0D0D">
+        android:background="#0D0D0D"
+        android:fillViewport="true">
 
-        <!-- Logo + título -->
         <LinearLayout
-            android:id="@+id/homeHeader"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="32dp"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="&#129503;"
-                android:textSize="52sp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="BraveTV Browser"
-                android:textColor="#FF6B35"
-                android:textSize="26sp"
-                android:textStyle="bold"
-                android:fontFamily="sans-serif-medium" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Elige tu modo de navegación"
-                android:textColor="#888888"
-                android:textSize="14sp"
-                android:layout_marginTop="4dp" />
-
-        </LinearLayout>
-
-        <!-- Tarjetas de acceso rápido -->
-        <LinearLayout
-            android:id="@+id/homeCards"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_below="@id/homeHeader"
-            android:layout_marginTop="28dp"
-            android:layout_marginStart="48dp"
-            android:layout_marginEnd="48dp"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:weightSum="4">
+            android:orientation="vertical"
+            android:paddingBottom="24dp">
 
-            <!-- Tarjeta 1: Brave Browser -->
+            <!-- Header -->
             <LinearLayout
-                android:id="@+id/cardBrave"
-                android:layout_width="0dp"
-                android:layout_height="180dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="12dp"
-                android:background="@drawable/card_brave"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="28dp"
+                android:layout_marginBottom="4dp"
                 android:orientation="vertical"
-                android:gravity="center"
-                android:padding="16dp"
-                android:focusable="true"
-                android:clickable="true"
-                android:nextFocusRight="@id/cardTor">
+                android:gravity="center">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="&#129503;"
-                    android:textSize="42sp" />
+                    android:textSize="48sp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Brave Browser"
+                    android:text="BraveTV Browser"
                     android:textColor="#FF6B35"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center" />
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Sin anuncios · VPN Auto"
-                    android:textColor="#AAAAAA"
-                    android:textSize="11sp"
-                    android:layout_marginTop="4dp"
-                    android:gravity="center" />
+                    android:text="Elige tu modo de navegación"
+                    android:textColor="#666666"
+                    android:textSize="13sp"
+                    android:layout_marginTop="2dp" />
 
             </LinearLayout>
 
-            <!-- Tarjeta 2: Tor Brave -->
-            <LinearLayout
-                android:id="@+id/cardTor"
-                android:layout_width="0dp"
-                android:layout_height="180dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="12dp"
-                android:background="@drawable/card_tor"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:padding="16dp"
-                android:focusable="true"
-                android:clickable="true"
-                android:nextFocusLeft="@id/cardBrave"
-                android:nextFocusRight="@id/cardYtTv">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="&#129492;"
-                    android:textSize="42sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Brave + Privado"
-                    android:textColor="#9B59B6"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Modo privado · Sin cookies"
-                    android:textColor="#AAAAAA"
-                    android:textSize="11sp"
-                    android:layout_marginTop="4dp"
-                    android:gravity="center" />
-
-            </LinearLayout>
-
-            <!-- Tarjeta 3: YouTube TV -->
-            <LinearLayout
-                android:id="@+id/cardYtTv"
-                android:layout_width="0dp"
-                android:layout_height="180dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="12dp"
-                android:background="@drawable/card_yt"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:padding="16dp"
-                android:focusable="true"
-                android:clickable="true"
-                android:nextFocusLeft="@id/cardTor"
-                android:nextFocusRight="@id/cardYtWeb">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="&#128250;"
-                    android:textSize="42sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="YouTube TV"
-                    android:textColor="#FF4444"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Interfaz de televisión"
-                    android:textColor="#AAAAAA"
-                    android:textSize="11sp"
-                    android:layout_marginTop="4dp"
-                    android:gravity="center" />
-
-            </LinearLayout>
-
-            <!-- Tarjeta 4: YouTube Web -->
-            <LinearLayout
-                android:id="@+id/cardYtWeb"
-                android:layout_width="0dp"
-                android:layout_height="180dp"
-                android:layout_weight="1"
-                android:background="@drawable/card_yt"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:padding="16dp"
-                android:focusable="true"
-                android:clickable="true"
-                android:nextFocusLeft="@id/cardYtTv">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="&#127910;"
-                    android:textSize="42sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="YouTube Web"
-                    android:textColor="#FF4444"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Versión escritorio completa"
-                    android:textColor="#AAAAAA"
-                    android:textSize="11sp"
-                    android:layout_marginTop="4dp"
-                    android:gravity="center" />
-
-            </LinearLayout>
-
-        </LinearLayout>
-
-        <!-- Indicador de estado VPN en la home -->
-        <LinearLayout
-            android:id="@+id/homeStatus"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/homeCards"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="20dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
+            <!-- VPN status -->
             <TextView
                 android:id="@+id/homeVpnStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="&#127758; VPN AUTO · 🇺🇸 EE.UU."
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="20dp"
+                android:text="&#127758; VPN AUTO · EE.UU."
                 android:textColor="#2ECC71"
-                android:textSize="13sp"
-                android:background="#1A2E1A"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp" />
+                android:textSize="12sp"
+                android:background="#0D2E0D"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="5dp"
+                android:paddingBottom="5dp" />
+
+            <!-- Mode cards -->
+            <LinearLayout
+                android:id="@+id/homeCards"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="40dp"
+                android:layout_marginEnd="40dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:weightSum="4">
+
+                <LinearLayout
+                    android:id="@+id/cardBrave"
+                    android:layout_width="0dp"
+                    android:layout_height="170dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="10dp"
+                    android:background="@drawable/card_brave"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="14dp"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusRight="@id/cardTor">
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="&#129503;" android:textSize="40sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Brave Browser" android:textColor="#FF6B35"
+                        android:textSize="13sp" android:textStyle="bold"
+                        android:layout_marginTop="8dp" android:gravity="center" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Sin anuncios · VPN Auto" android:textColor="#888888"
+                        android:textSize="10sp" android:layout_marginTop="4dp" android:gravity="center" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/cardTor"
+                    android:layout_width="0dp"
+                    android:layout_height="170dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="10dp"
+                    android:background="@drawable/card_tor"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="14dp"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusLeft="@id/cardBrave"
+                    android:nextFocusRight="@id/cardYtTv">
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="&#129492;" android:textSize="40sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Brave + Privado" android:textColor="#9B59B6"
+                        android:textSize="13sp" android:textStyle="bold"
+                        android:layout_marginTop="8dp" android:gravity="center" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Sin cookies · Incógnito" android:textColor="#888888"
+                        android:textSize="10sp" android:layout_marginTop="4dp" android:gravity="center" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/cardYtTv"
+                    android:layout_width="0dp"
+                    android:layout_height="170dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="10dp"
+                    android:background="@drawable/card_yt"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="14dp"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusLeft="@id/cardTor"
+                    android:nextFocusRight="@id/cardYtWeb">
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="&#128250;" android:textSize="40sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="YouTube TV" android:textColor="#FF4444"
+                        android:textSize="13sp" android:textStyle="bold"
+                        android:layout_marginTop="8dp" android:gravity="center" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Interfaz de televisión" android:textColor="#888888"
+                        android:textSize="10sp" android:layout_marginTop="4dp" android:gravity="center" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/cardYtWeb"
+                    android:layout_width="0dp"
+                    android:layout_height="170dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/card_yt"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="14dp"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusLeft="@id/cardYtTv">
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="&#127910;" android:textSize="40sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="YouTube Web" android:textColor="#FF4444"
+                        android:textSize="13sp" android:textStyle="bold"
+                        android:layout_marginTop="8dp" android:gravity="center" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Versión escritorio" android:textColor="#888888"
+                        android:textSize="10sp" android:layout_marginTop="4dp" android:gravity="center" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Recientes section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="48dp"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="10dp"
+                android:text="Recientes"
+                android:textColor="#666666"
+                android:textSize="12sp"
+                android:textAllCaps="true"
+                android:letterSpacing="0.1" />
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="40dp"
+                android:paddingEnd="40dp"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/recentsList"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+            </HorizontalScrollView>
+
+            <!-- Hint -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="20dp"
+                android:text="ATRÁS = salir  ·  Mantén VPN = elegir región"
+                android:textColor="#333333"
+                android:textSize="11sp" />
 
         </LinearLayout>
-
-        <!-- Hint de ayuda -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"
-            android:layout_centerHorizontal="true"
-            android:layout_marginBottom="20dp"
-            android:text="Botón ATRÁS = volver aquí  ·  Mantén VPN = cambiar región"
-            android:textColor="#444444"
-            android:textSize="11sp" />
-
-    </RelativeLayout>
+    </ScrollView>
 
 </RelativeLayout>
