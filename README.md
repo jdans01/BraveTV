@@ -121,7 +121,10 @@ adb install -r BraveTVBrowser.apk
 
 ## 🖼️ Capturas
 
-> *Las capturas se generarán con la primera versión pública.*
+| Pantalla de inicio | Brave Search | YouTube TV |
+|:-:|:-:|:-:|
+| ![Home](docs/screenshots/home.jpg) | ![Brave Search](docs/screenshots/brave_search.jpg) | ![YouTube TV](docs/screenshots/youtube_tv.jpg) |
+| 4 modos · contador de bloqueos · VPN status | search.brave.com · 38 anuncios bloqueados | YouTube TV optimizado para pantalla grande |
 
 ---
 
@@ -240,6 +243,19 @@ app/src/main/
 | Videos se pausan solos | Asegúrate de que "Ahorro de energía" no corte la app en segundo plano. |
 | Barra de navegación no aparece | Pulsa el botón Back del mando para revelarla. |
 | Error "Fuentes desconocidas" al instalar | Sigue las instrucciones de [activar fuentes desconocidas](#activar-instalación-desde-fuentes-desconocidas). |
+
+---
+
+## ☕ Donaciones
+
+Si la app te es útil y quieres apoyar el desarrollo:
+
+| Red | Dirección |
+|-----|-----------|
+| **Bitcoin (BTC)** | `bc1qa78yurqt2wsuc7nglnpwc867zxgjtcj0ztdzq0` |
+| **Solana (SOL)** | `84e1VXoQx5AVdBH29CERnhveNEAQKf1CnFFJxrY1rwSF` |
+
+Cualquier contribución, por pequeña que sea, ayuda a mantener el proyecto activo. ¡Gracias! 🙏
 
 ---
 
