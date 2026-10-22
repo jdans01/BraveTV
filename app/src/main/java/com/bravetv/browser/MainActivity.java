@@ -8,21 +8,24 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.*;
 import android.widget.*;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.util.*;
 
 public class MainActivity extends Activity {
 
-    // Modos de navegación
-    private static final int MODE_BRAVE    = 0;  // ad-block + VPN auto
-    private static final int MODE_PRIVATE  = 1;  // privado (sin cookies, UA genérico)
-    private static final int MODE_YT_TV    = 2;  // youtube.com/tv
-    private static final int MODE_YT_WEB   = 3;  // youtube.com escritorio
+    private static final int MODE_BRAVE   = 0;
+    private static final int MODE_PRIVATE = 1;
+    private static final int MODE_YT_TV   = 2;
+    private static final int MODE_YT_WEB  = 3;
 
     private int currentMode = MODE_BRAVE;
 
@@ -32,19 +35,22 @@ public class MainActivity extends Activity {
     private TextView statusText;
     private LinearLayout navBar;
     private Button btnVpn;
-    private RelativeLayout homeScreen;
+    private ScrollView homeScreen;
     private TextView homeVpnStatus;
+    private LinearLayout recentsList;
     private SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
-    // ─── Regiones para rotación automática ───────────────────────────────────
+    private boolean navBarHidden = false;
+
+    // ─── Regiones ─────────────────────────────────────────────────────────────
     private static final String[] AUTO_REGIONS = {
-        "US", "GB", "DE", "CA", "FR", "NL", "SE", "CH", "AU", "JP"
+        "US","GB","DE","CA","FR","NL","SE","CH","AU","JP"
     };
     private static final String[] AUTO_LABELS = {
-        "🇺🇸 EE.UU.", "🇬🇧 UK", "🇩🇪 Alemania", "🇨🇦 Canadá",
-        "🇫🇷 Francia", "🇳🇱 Países Bajos", "🇸🇪 Suecia", "🇨🇭 Suiza",
-        "🇦🇺 Australia", "🇯🇵 Japón"
+        "🇺🇸 EE.UU.","🇬🇧 UK","🇩🇪 Alemania","🇨🇦 Canadá",
+        "🇫🇷 Francia","🇳🇱 Países Bajos","🇸🇪 Suecia","🇨🇭 Suiza",
+        "🇦🇺 Australia","🇯🇵 Japón"
     };
 
     private boolean autoVpnEnabled = true;
@@ -53,23 +59,23 @@ public class MainActivity extends Activity {
     private int switchCount = 0;
     private static final int MAX_SWITCHES = AUTO_REGIONS.length;
 
-    // ─── Bloqueador de anuncios ───────────────────────────────────────────────
+    // ─── Ad block ─────────────────────────────────────────────────────────────
     private static final Set<String> AD_HOSTS = new HashSet<>(Arrays.asList(
-        "ad.youtube.com", "ads.youtube.com", "googleadservices.com",
-        "googlesyndication.com", "doubleclick.net", "googletagmanager.com",
-        "googletagservices.com", "adservice.google.com", "adservice.google.com.mx",
-        "imasdk.googleapis.com", "pagead2.googlesyndication.com",
-        "tpc.googlesyndication.com", "www.googleadservices.com",
-        "analytics.google.com", "google-analytics.com", "stats.g.doubleclick.net",
-        "cm.g.doubleclick.net", "ad.doubleclick.net", "securepubads.g.doubleclick.net",
-        "pubads.g.doubleclick.net", "connect.facebook.net", "graph.facebook.com",
-        "outbrain.com", "taboola.com", "moatads.com", "amazon-adsystem.com",
-        "adsafeprotected.com", "2mdn.net", "adnxs.com"
+        "ad.youtube.com","ads.youtube.com","googleadservices.com",
+        "googlesyndication.com","doubleclick.net","googletagmanager.com",
+        "googletagservices.com","adservice.google.com","adservice.google.com.mx",
+        "imasdk.googleapis.com","pagead2.googlesyndication.com",
+        "tpc.googlesyndication.com","www.googleadservices.com",
+        "analytics.google.com","google-analytics.com","stats.g.doubleclick.net",
+        "cm.g.doubleclick.net","ad.doubleclick.net","securepubads.g.doubleclick.net",
+        "pubads.g.doubleclick.net","connect.facebook.net","graph.facebook.com",
+        "outbrain.com","taboola.com","moatads.com","amazon-adsystem.com",
+        "adsafeprotected.com","2mdn.net","adnxs.com"
     ));
     private static final Set<String> AD_URL_PATTERNS = new HashSet<>(Arrays.asList(
-        "/pagead/", "/ads/", "/adview", "ad_type=", "doubleclick", "/ptracking",
-        "/get_video_info?", "googlevideo.com/videoplayback?ctier=L",
-        "youtube.com/api/stats/ads", "youtube.com/pagead", "youtube.com/ptracking"
+        "/pagead/","/ads/","/adview","ad_type=","doubleclick","/ptracking",
+        "/get_video_info?","googlevideo.com/videoplayback?ctier=L",
+        "youtube.com/api/stats/ads","youtube.com/pagead","youtube.com/ptracking"
     ));
 
     private boolean isAdUrl(String url) {
@@ -79,22 +85,20 @@ public class MainActivity extends Activity {
             String host = uri.getHost();
             if (host != null) {
                 if (AD_HOSTS.contains(host)) return true;
-                for (String adHost : AD_HOSTS)
-                    if (host.endsWith("." + adHost) || host.equals(adHost)) return true;
+                for (String h : AD_HOSTS)
+                    if (host.endsWith("." + h) || host.equals(h)) return true;
             }
-            for (String pattern : AD_URL_PATTERNS)
-                if (url.contains(pattern)) return true;
-        } catch (Exception ignored) { }
+            for (String p : AD_URL_PATTERNS) if (url.contains(p)) return true;
+        } catch (Exception ignored) {}
         return false;
     }
 
-    // ─── Región / bypass geográfico ───────────────────────────────────────────
+    // ─── Región ───────────────────────────────────────────────────────────────
     private String applyRegion(String url) {
         if (!autoVpnEnabled || url == null) return url;
         if (!url.contains("youtube.com") && !url.contains("youtu.be")) return url;
         try {
-            Uri uri = Uri.parse(url);
-            Uri.Builder b = uri.buildUpon();
+            Uri.Builder b = Uri.parse(url).buildUpon();
             b.appendQueryParameter("gl", AUTO_REGIONS[regionIndex]);
             b.appendQueryParameter("hl", "es");
             return b.build().toString();
@@ -144,33 +148,164 @@ public class MainActivity extends Activity {
         switchInProgress = true;
         switchCount++;
         regionIndex = (regionIndex + 1) % AUTO_REGIONS.length;
-        String label = AUTO_LABELS[regionIndex];
-        Toast.makeText(this, "🔄 Bloqueado → cambiando a " + label, Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "🔄 Bloqueado → cambiando a " + AUTO_LABELS[regionIndex], Toast.LENGTH_SHORT).show();
         updateVpnButton();
         applyRegionCookies();
         String url = webView.getUrl();
         String target = (url != null && url.contains("youtube.com"))
-            ? applyRegion(url)
-            : applyRegion("https://www.youtube.com/tv");
-        handler.postDelayed(() -> {
-            webView.loadUrl(target);
-            switchInProgress = false;
-        }, 800);
+            ? applyRegion(url) : applyRegion("https://www.youtube.com/tv");
+        handler.postDelayed(() -> { webView.loadUrl(target); switchInProgress = false; }, 800);
     }
 
+    // ─── JS Interface ─────────────────────────────────────────────────────────
     private class BraveTVInterface {
         @JavascriptInterface
         public void onGeoBlock(String reason) {
             handler.post(() -> onGeoBlockDetected(reason));
         }
-
         @JavascriptInterface
         public void onVideoOk() {
             handler.post(() -> switchCount = 0);
         }
+        @JavascriptInterface
+        public void onFullscreen(boolean full) {
+            handler.post(() -> setNavBarHidden(full));
+        }
     }
 
-    // ─── Ciclo de vida ────────────────────────────────────────────────────────
+    // ─── Navbar auto-hide ─────────────────────────────────────────────────────
+    private void setNavBarHidden(boolean hide) {
+        if (hide == navBarHidden) return;
+        navBarHidden = hide;
+        if (hide) {
+            navBar.animate().translationY(-navBar.getHeight()).setDuration(300).start();
+        } else {
+            navBar.animate().translationY(0).setDuration(300).start();
+        }
+    }
+
+    // ─── Recent history ───────────────────────────────────────────────────────
+    private static final int MAX_RECENTS = 8;
+    private static final String PREF_RECENTS = "recents_json";
+
+    private void saveRecent(String url, String title) {
+        if (url == null || title == null || title.isEmpty()) return;
+        // Skip generic YouTube home pages
+        String lower = title.toLowerCase();
+        if (lower.equals("youtube") || url.matches(".*youtube\\.com/(tv)?\\??$")
+                || url.matches(".*youtube\\.com/\\?.*") || title.length() < 3) return;
+
+        try {
+            String json = prefs.getString(PREF_RECENTS, "[]");
+            JSONArray arr = new JSONArray(json);
+            // Remove duplicate url
+            JSONArray filtered = new JSONArray();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                if (!o.optString("url").equals(url)) filtered.put(o);
+            }
+            // Prepend new entry
+            JSONObject entry = new JSONObject();
+            entry.put("url", url);
+            entry.put("title", title);
+            JSONArray result = new JSONArray();
+            result.put(entry);
+            for (int i = 0; i < filtered.length() && i < MAX_RECENTS - 1; i++)
+                result.put(filtered.get(i));
+            prefs.edit().putString(PREF_RECENTS, result.toString()).apply();
+        } catch (Exception ignored) {}
+    }
+
+    private void renderRecents() {
+        if (recentsList == null) return;
+        recentsList.removeAllViews();
+        try {
+            String json = prefs.getString(PREF_RECENTS, "[]");
+            JSONArray arr = new JSONArray(json);
+            if (arr.length() == 0) {
+                TextView empty = new TextView(this);
+                empty.setText("Aún no hay páginas visitadas");
+                empty.setTextColor(0xFF444444);
+                empty.setTextSize(12f);
+                empty.setPadding(dp(8), dp(8), dp(8), dp(8));
+                recentsList.addView(empty);
+                return;
+            }
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                String url   = o.optString("url", "");
+                String title = o.optString("title", url);
+                addRecentCard(url, title);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void addRecentCard(String url, String title) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(android.view.Gravity.CENTER);
+        card.setFocusable(true);
+        card.setClickable(true);
+        card.setBackground(getDrawable(R.drawable.card_recent));
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(160), dp(88));
+        lp.setMarginEnd(dp(10));
+        card.setLayoutParams(lp);
+        card.setPadding(dp(10), dp(8), dp(10), dp(8));
+
+        // Domain icon character
+        String icon = "🌐";
+        if (url.contains("youtube.com")) icon = "▶";
+        TextView iconView = new TextView(this);
+        iconView.setText(icon);
+        iconView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f);
+        iconView.setTextColor(0xFFFF6B35);
+        iconView.setGravity(android.view.Gravity.CENTER);
+        card.addView(iconView);
+
+        TextView titleView = new TextView(this);
+        titleView.setText(title);
+        titleView.setTextColor(0xFFCCCCCC);
+        titleView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f);
+        titleView.setMaxLines(2);
+        titleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        titleView.setGravity(android.view.Gravity.CENTER);
+        titleView.setLayoutParams(new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT));
+        card.addView(titleView);
+
+        // Focus animation
+        card.setOnFocusChangeListener((v, focused) -> {
+            if (focused) {
+                v.animate().scaleX(1.08f).scaleY(1.08f).setDuration(150).start();
+                v.setElevation(dp(16));
+            } else {
+                v.animate().scaleX(1f).scaleY(1f).setDuration(150).start();
+                v.setElevation(dp(4));
+            }
+        });
+
+        String finalUrl = url;
+        card.setOnClickListener(v -> {
+            currentMode = MODE_BRAVE;
+            showBrowser();
+            configureWebViewForMode(MODE_BRAVE);
+            applyRegionCookies();
+            updateVpnButton();
+            loadUrl(applyRegion(finalUrl));
+            webView.requestFocus();
+        });
+
+        recentsList.addView(card);
+    }
+
+    private int dp(int value) {
+        return (int) TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, value, getResources().getDisplayMetrics());
+    }
+
+    // ─── Lifecycle ────────────────────────────────────────────────────────────
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -179,14 +314,15 @@ public class MainActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_main);
 
-        webView      = findViewById(R.id.webView);
-        urlBar       = findViewById(R.id.urlBar);
-        progressBar  = findViewById(R.id.progressBar);
-        statusText   = findViewById(R.id.statusText);
-        navBar       = findViewById(R.id.navBar);
-        btnVpn       = findViewById(R.id.btnVpn);
-        homeScreen   = findViewById(R.id.homeScreen);
+        webView       = findViewById(R.id.webView);
+        urlBar        = findViewById(R.id.urlBar);
+        progressBar   = findViewById(R.id.progressBar);
+        statusText    = findViewById(R.id.statusText);
+        navBar        = findViewById(R.id.navBar);
+        btnVpn        = findViewById(R.id.btnVpn);
+        homeScreen    = findViewById(R.id.homeScreen);
         homeVpnStatus = findViewById(R.id.homeVpnStatus);
+        recentsList   = findViewById(R.id.recentsList);
 
         prefs = getSharedPreferences("bravetv", MODE_PRIVATE);
         autoVpnEnabled = prefs.getBoolean("vpn", true);
@@ -197,33 +333,75 @@ public class MainActivity extends Activity {
 
         setupWebView();
         setupButtons();
+        setupCardFocusAnimations();
         updateHomeVpnStatus();
-
-        // Mostrar pantalla de inicio al arrancar
         showHome();
     }
 
-    // ─── Pantalla de inicio ───────────────────────────────────────────────────
+    // ─── Card focus animations ────────────────────────────────────────────────
+    private void setupCardFocusAnimations() {
+        int[] cardIds = {R.id.cardBrave, R.id.cardTor, R.id.cardYtTv, R.id.cardYtWeb};
+        for (int id : cardIds) {
+            View card = findViewById(id);
+            card.setOnFocusChangeListener((v, focused) -> {
+                if (focused) {
+                    v.animate().scaleX(1.08f).scaleY(1.08f).setDuration(150).start();
+                    v.setElevation(dp(16));
+                } else {
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(150).start();
+                    v.setElevation(dp(4));
+                }
+            });
+        }
+    }
+
+    // ─── Home / browser transitions ──────────────────────────────────────────
     private void showHome() {
-        homeScreen.setVisibility(View.VISIBLE);
-        navBar.setVisibility(View.GONE);
-        webView.setVisibility(View.GONE);
-        progressBar.setVisibility(View.GONE);
+        setNavBarHidden(false);
+        renderRecents();
         updateHomeVpnStatus();
-        // Enfocar la primera tarjeta con el mando
+
+        homeScreen.setAlpha(0f);
+        homeScreen.setVisibility(View.VISIBLE);
+        homeScreen.animate().alpha(1f).setDuration(250).start();
+
+        navBar.animate().alpha(0f).setDuration(200)
+            .withEndAction(() -> {
+                navBar.setVisibility(View.GONE);
+                navBar.setAlpha(1f);
+            }).start();
+        webView.animate().alpha(0f).setDuration(200)
+            .withEndAction(() -> {
+                webView.setVisibility(View.GONE);
+                webView.setAlpha(1f);
+            }).start();
+        progressBar.setVisibility(View.GONE);
+
         handler.postDelayed(() -> {
             View card = findViewById(R.id.cardBrave);
             if (card != null) card.requestFocus();
-        }, 150);
+        }, 300);
+    }
+
+    private void showBrowser() {
+        navBar.setAlpha(0f);
+        navBar.setVisibility(View.VISIBLE);
+        navBar.animate().alpha(1f).setDuration(250).start();
+
+        webView.setAlpha(0f);
+        webView.setVisibility(View.VISIBLE);
+        webView.animate().alpha(1f).setDuration(250).start();
+
+        homeScreen.animate().alpha(0f).setDuration(200)
+            .withEndAction(() -> {
+                homeScreen.setVisibility(View.GONE);
+                homeScreen.setAlpha(1f);
+            }).start();
     }
 
     private void launchMode(int mode) {
         currentMode = mode;
-        homeScreen.setVisibility(View.GONE);
-        navBar.setVisibility(View.VISIBLE);
-        webView.setVisibility(View.VISIBLE);
-
-        // Configurar WebView según modo
+        showBrowser();
         configureWebViewForMode(mode);
 
         String url;
@@ -240,7 +418,7 @@ public class MainActivity extends Activity {
                     ? "https://www.youtube.com/?gl=" + AUTO_REGIONS[regionIndex] + "&hl=es"
                     : "https://www.youtube.com/";
                 break;
-            default: // MODE_BRAVE
+            default:
                 url = applyRegion("https://www.youtube.com/tv");
                 break;
         }
@@ -248,7 +426,7 @@ public class MainActivity extends Activity {
         applyRegionCookies();
         updateVpnButton();
         loadUrl(url);
-        webView.requestFocus();
+        handler.postDelayed(() -> webView.requestFocus(), 350);
     }
 
     private void configureWebViewForMode(int mode) {
@@ -264,7 +442,6 @@ public class MainActivity extends Activity {
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
             CookieManager.getInstance().setAcceptCookie(true);
         } else {
-            // TV user-agent para Brave y YouTube TV
             s.setUserAgentString(
                 "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) " +
                 "AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1");
@@ -280,7 +457,7 @@ public class MainActivity extends Activity {
         CookieManager.getInstance().flush();
     }
 
-    // ─── WebView ───────────────────────────────────────────────────────────────
+    // ─── WebView setup ────────────────────────────────────────────────────────
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     private void setupWebView() {
         WebSettings s = webView.getSettings();
@@ -300,13 +477,11 @@ public class MainActivity extends Activity {
         webView.addJavascriptInterface(new BraveTVInterface(), "BraveTV");
 
         webView.setWebViewClient(new WebViewClient() {
-
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
-                if (isAdUrl(req.getUrl().toString())) {
+                if (isAdUrl(req.getUrl().toString()))
                     return new WebResourceResponse("text/plain", "utf-8",
                         new java.io.ByteArrayInputStream("".getBytes()));
-                }
                 return super.shouldInterceptRequest(view, req);
             }
 
@@ -316,10 +491,8 @@ public class MainActivity extends Activity {
                 super.onReceivedHttpError(view, req, resp);
                 if (resp != null && resp.getStatusCode() == 403) {
                     String url = req.getUrl().toString();
-                    if (url.contains("youtube.com") && !isAdUrl(url)
-                            && currentMode != MODE_PRIVATE) {
+                    if (url.contains("youtube.com") && !isAdUrl(url) && currentMode != MODE_PRIVATE)
                         onGeoBlockDetected("http_403");
-                    }
                 }
             }
 
@@ -335,58 +508,66 @@ public class MainActivity extends Activity {
                 progressBar.setVisibility(View.GONE);
                 urlBar.setText(url);
 
-                // Ocultar elementos de anuncios
+                // Save to recents (title via JS)
+                view.evaluateJavascript("document.title", result -> {
+                    if (result != null) {
+                        String title = result.replaceAll("^\"|\"$", "").trim();
+                        saveRecent(url, title);
+                    }
+                });
+
+                // Hide ad elements
                 view.evaluateJavascript(
-                    "(function(){" +
-                    "var s=document.createElement('style');" +
+                    "(function(){var s=document.createElement('style');" +
                     "s.innerHTML='ytd-display-ad-renderer,ytd-promoted-sparkles-web-renderer," +
                     "ytd-promoted-video-renderer,ytd-search-pyv-renderer,.ytp-ad-module," +
                     ".ytp-ad-overlay-container,.ytp-ad-text-overlay,.video-ads," +
                     "#player-ads,ytm-promoted-sparkles-web-renderer{display:none!important}';" +
                     "document.head.appendChild(s);})()", null);
 
-                // Auto-skip de anuncios
+                // Auto-skip ads
                 view.evaluateJavascript(
                     "setInterval(function(){" +
                     "var sk=document.querySelector('.ytp-ad-skip-button,.ytp-skip-ad-button');" +
                     "if(sk)sk.click();" +
                     "if(document.querySelector('.ad-showing')){" +
-                    "  var v=document.querySelector('video');if(v)v.currentTime=v.duration;}" +
-                    "},300);", null);
+                    "var v=document.querySelector('video');if(v)v.currentTime=v.duration;}},300);", null);
 
-                // Cookie de región (excepto modo privado)
+                // Region cookie
                 if (autoVpnEnabled && currentMode != MODE_PRIVATE) {
                     String gl = AUTO_REGIONS[regionIndex];
                     view.evaluateJavascript(
                         "document.cookie='PREF=f6=8&gl=" + gl + "; domain=.youtube.com; path=/';", null);
                 }
 
-                // Detector de bloqueo geográfico
+                // Geo-block detector
                 if (currentMode != MODE_PRIVATE) {
                     view.evaluateJavascript(
-                        "(function(){" +
-                        "  var kw=['country','región','region','not available'," +
-                        "          'tu país','disponible','restricted','blocked'];" +
-                        "  var sel=['.ytp-error-content-wrap-subreason'," +
-                        "    '.ytp-error-content-wrap-reason'," +
-                        "    '#error-screen yt-formatted-string'," +
-                        "    '#player .ytp-error-content'];" +
-                        "  function check(){" +
-                        "    for(var i=0;i<sel.length;i++){" +
-                        "      var el=document.querySelector(sel[i]);" +
-                        "      if(el){var t=el.textContent.toLowerCase();" +
-                        "        for(var j=0;j<kw.length;j++){" +
-                        "          if(t.indexOf(kw[j])>=0){" +
-                        "            if(typeof BraveTV!=='undefined') BraveTV.onGeoBlock(t.substring(0,80));" +
-                        "            return;" +
-                        "          }}}" +
-                        "    }" +
-                        "    var v=document.querySelector('video');" +
-                        "    if(v&&v.currentTime>3&&!v.paused&&typeof BraveTV!=='undefined') BraveTV.onVideoOk();" +
-                        "  }" +
-                        "  setInterval(check,3000);" +
-                        "})()", null);
+                        "(function(){var kw=['country','región','region','not available'," +
+                        "'tu país','disponible','restricted','blocked'];" +
+                        "var sel=['.ytp-error-content-wrap-subreason'," +
+                        "'.ytp-error-content-wrap-reason','#error-screen yt-formatted-string'," +
+                        "'#player .ytp-error-content'];" +
+                        "function check(){for(var i=0;i<sel.length;i++){" +
+                        "var el=document.querySelector(sel[i]);if(el){" +
+                        "var t=el.textContent.toLowerCase();" +
+                        "for(var j=0;j<kw.length;j++){if(t.indexOf(kw[j])>=0){" +
+                        "if(typeof BraveTV!=='undefined')BraveTV.onGeoBlock(t.substring(0,80));return;}}}}" +
+                        "var v=document.querySelector('video');" +
+                        "if(v&&v.currentTime>3&&!v.paused&&typeof BraveTV!=='undefined')BraveTV.onVideoOk();}" +
+                        "setInterval(check,3000);})()", null);
                 }
+
+                // Fullscreen / auto-hide navbar detector
+                view.evaluateJavascript(
+                    "(function(){var _fs=false;" +
+                    "setInterval(function(){" +
+                    "var v=document.querySelector('video');" +
+                    "var fs=!!document.fullscreenElement||" +
+                    "(!!v&&!v.paused&&v.currentTime>2&&" +
+                    "!!document.querySelector('.ytp-fullscreen'));" +
+                    "if(fs!==_fs){_fs=fs;" +
+                    "if(typeof BraveTV!=='undefined')BraveTV.onFullscreen(fs);}},1500);})()", null);
             }
 
             @Override
@@ -417,6 +598,8 @@ public class MainActivity extends Activity {
                 c.setVisibility(View.GONE);
                 webView.setVisibility(View.VISIBLE);
                 navBar.setVisibility(View.VISIBLE);
+                navBarHidden = false;
+                navBar.setTranslationY(0);
             }
         });
 
@@ -424,20 +607,16 @@ public class MainActivity extends Activity {
         webView.setFocusableInTouchMode(true);
     }
 
-    // ─── Botones ───────────────────────────────────────────────────────────────
+    // ─── Buttons ──────────────────────────────────────────────────────────────
     private void setupButtons() {
-        // Home screen cards
         findViewById(R.id.cardBrave).setOnClickListener(v -> launchMode(MODE_BRAVE));
         findViewById(R.id.cardTor).setOnClickListener(v -> launchMode(MODE_PRIVATE));
         findViewById(R.id.cardYtTv).setOnClickListener(v -> launchMode(MODE_YT_TV));
         findViewById(R.id.cardYtWeb).setOnClickListener(v -> launchMode(MODE_YT_WEB));
 
-        // Nav bar
         findViewById(R.id.btnYoutube).setOnClickListener(v ->
             loadUrl(currentMode == MODE_YT_WEB
-                ? "https://www.youtube.com/"
-                : applyRegion("https://www.youtube.com/tv")));
-
+                ? "https://www.youtube.com/" : applyRegion("https://www.youtube.com/tv")));
         findViewById(R.id.btnSearch).setOnClickListener(v -> showSearchDialog());
         findViewById(R.id.btnBack).setOnClickListener(v -> {
             if (webView.canGoBack()) webView.goBack();
@@ -448,7 +627,6 @@ public class MainActivity extends Activity {
         findViewById(R.id.btnRefresh).setOnClickListener(v -> webView.reload());
         findViewById(R.id.btnHome).setOnClickListener(v -> showHome());
 
-        // VPN toggle
         btnVpn.setOnClickListener(v -> {
             autoVpnEnabled = !autoVpnEnabled;
             prefs.edit().putBoolean("vpn", autoVpnEnabled).apply();
@@ -460,7 +638,6 @@ public class MainActivity extends Activity {
             webView.reload();
         });
 
-        // Mantener pulsado VPN → selector de región
         btnVpn.setOnLongClickListener(v -> {
             if (!autoVpnEnabled) return true;
             new android.app.AlertDialog.Builder(this)
@@ -526,8 +703,12 @@ public class MainActivity extends Activity {
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (homeScreen.getVisibility() == View.VISIBLE) {
-                // Salir de la app desde la home
                 finish();
+                return true;
+            }
+            // Reveal navbar first if hidden
+            if (navBarHidden) {
+                setNavBarHidden(false);
                 return true;
             }
             if (webView.canGoBack()) {
@@ -540,6 +721,17 @@ public class MainActivity extends Activity {
         if (keyCode == KeyEvent.KEYCODE_SEARCH) {
             if (homeScreen.getVisibility() == View.GONE) showSearchDialog();
             return true;
+        }
+        // D-pad scroll in WebView
+        if (webView.getVisibility() == View.VISIBLE && webView.hasFocus()) {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                webView.evaluateJavascript("window.scrollBy(0,200)", null);
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                webView.evaluateJavascript("window.scrollBy(0,-200)", null);
+                return true;
+            }
         }
         return super.onKeyDown(keyCode, event);
     }
