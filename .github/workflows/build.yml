@@ -3,6 +3,8 @@ name: Build BraveTV APK
 on:
   push:
     branches: [ main, master, "claude/**" ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -30,9 +32,26 @@ jobs:
         working-directory: .
         run: gradle assembleDebug --stacktrace
 
-      - name: Upload APK
+      - name: Rename APK
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/BraveTVBrowser.apk
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: BraveTV-Browser-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: dist/BraveTVBrowser.apk
           retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "BraveTV Browser ${{ github.ref_name }}"
+          body_path: RELEASE_NOTES.md
+          files: dist/BraveTVBrowser.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
