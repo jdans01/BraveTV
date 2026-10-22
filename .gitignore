@@ -1,0 +1,32 @@
+# Android build outputs
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Build directories
+build/
+app/build/
+.gradle/
+local.properties
+
+# Android Studio
+*.iml
+.idea/
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+*.orig
+
+# Signing keys (NEVER commit these)
+*.jks
+*.keystore
+keystore.properties
+
+# Gradle
+gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Logs
+*.log
