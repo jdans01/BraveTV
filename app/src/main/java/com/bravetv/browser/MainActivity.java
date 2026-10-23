@@ -1189,8 +1189,14 @@ public class MainActivity extends Activity {
             if (jsKey != -1) {
                 final int k = jsKey;
                 webView.evaluateJavascript(
-                    "(function(){var e=new KeyboardEvent('keydown'," +
-                    "{bubbles:true,cancelable:true,keyCode:" + k + ",which:" + k + "});" +
+                    // KeyboardEventInit.keyCode is spec-inert in Chromium — the constructor
+                    // silently ignores it (keyCode is meant to come from the real native event),
+                    // so the dispatched event always carried keyCode===0 and the injected
+                    // spatial-nav listener's `if(e.keyCode===38)...` checks never matched. Force
+                    // it with defineProperty instead; that's the only way to set it post-construct.
+                    "(function(){var e=new KeyboardEvent('keydown',{bubbles:true,cancelable:true});" +
+                    "Object.defineProperty(e,'keyCode',{get:function(){return " + k + ";}});" +
+                    "Object.defineProperty(e,'which',{get:function(){return " + k + ";}});" +
                     "document.dispatchEvent(e);})()", null);
                 return true;
             }
