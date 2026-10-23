@@ -1,16 +1,21 @@
 package com.bravetv.browser;
 
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.PointF;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.TypedValue;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.animation.DecelerateInterpolator;
 import android.view.WindowManager;
 import android.webkit.*;
 import android.widget.*;
@@ -46,6 +51,16 @@ public class MainActivity extends Activity {
     private TextView btnBlockCount;
     private TextView homeBlockCount;
     private View btnRevealNav;
+
+    // ─── Pointer / cursor mode ────────────────────────────────────────────────
+    private boolean pointerMode = false;
+    private View cursorDot;
+    private Button btnCursorToggle;
+    private final PointF cursor = new PointF(640, 360);
+    private static final int CURSOR_STEP = 32;
+    private final Runnable cursorHideRunnable = () -> {
+        if (cursorDot != null) cursorDot.setVisibility(View.GONE);
+    };
 
     // ─── Regiones ─────────────────────────────────────────────────────────────
     private static final String[] AUTO_REGIONS = {
@@ -274,7 +289,7 @@ public class MainActivity extends Activity {
         card.setClickable(true);
         card.setBackground(getDrawable(R.drawable.card_recent));
 
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(180), dp(112));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(188), dp(116));
         lp.setMarginEnd(dp(12));
         card.setLayoutParams(lp);
         card.setPadding(dp(12), dp(10), dp(12), dp(10));
@@ -355,6 +370,9 @@ public class MainActivity extends Activity {
         homeBlockCount = findViewById(R.id.homeBlockCount);
         btnRevealNav   = findViewById(R.id.btnRevealNav);
         btnRevealNav.setOnClickListener(v -> setNavBarHidden(false));
+        cursorDot      = findViewById(R.id.cursorDot);
+        btnCursorToggle = findViewById(R.id.btnCursor);
+        btnCursorToggle.setOnClickListener(v -> togglePointerMode());
 
         prefs = getSharedPreferences("bravetv", 0); // Context.MODE_PRIVATE = 0
         autoVpnEnabled = prefs.getBoolean("vpn", true);
@@ -370,19 +388,69 @@ public class MainActivity extends Activity {
         showHome();
     }
 
+    // ─── Pointer mode ─────────────────────────────────────────────────────────
+    private void togglePointerMode() {
+        pointerMode = !pointerMode;
+        if (btnCursorToggle != null) {
+            btnCursorToggle.setTextColor(pointerMode ? 0xFF4ADE80 : 0xFFC084FC);
+        }
+        if (pointerMode) {
+            // Center cursor on screen
+            webView.post(() -> {
+                cursor.set(webView.getWidth() / 2f, webView.getHeight() / 2f);
+                moveCursorTo(cursor.x, cursor.y);
+                cursorDot.setVisibility(View.VISIBLE);
+            });
+        } else {
+            handler.removeCallbacks(cursorHideRunnable);
+            if (cursorDot != null) cursorDot.setVisibility(View.GONE);
+        }
+        Toast.makeText(this,
+            pointerMode ? "🖱️ Puntero activado — D-pad mueve, OK clic" : "🎮 D-pad normal",
+            Toast.LENGTH_SHORT).show();
+    }
+
+    private void moveCursorTo(float x, float y) {
+        if (cursorDot == null) return;
+        int w = webView.getWidth();
+        int h = webView.getHeight();
+        float cx = Math.max(0, Math.min(x, w));
+        float cy = Math.max(0, Math.min(y, h));
+        cursor.set(cx, cy);
+        int dotW = cursorDot.getWidth();
+        int dotH = cursorDot.getHeight();
+        cursorDot.setX(cx - dotW / 2f);
+        cursorDot.setY(cy - dotH / 2f);
+        cursorDot.setVisibility(View.VISIBLE);
+        handler.removeCallbacks(cursorHideRunnable);
+        handler.postDelayed(cursorHideRunnable, 3000);
+    }
+
+    private void simulateClick(float x, float y) {
+        long now = android.os.SystemClock.uptimeMillis();
+        MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x, y, 0);
+        MotionEvent up   = MotionEvent.obtain(now, now + 100, MotionEvent.ACTION_UP, x, y, 0);
+        webView.dispatchTouchEvent(down);
+        webView.dispatchTouchEvent(up);
+        down.recycle();
+        up.recycle();
+    }
+
     // ─── Card focus animations ────────────────────────────────────────────────
     private void setupCardFocusAnimations() {
+        DecelerateInterpolator interp = new DecelerateInterpolator(1.5f);
         int[] cardIds = {R.id.cardBrave, R.id.cardTor, R.id.cardYtTv, R.id.cardYtWeb};
         for (int id : cardIds) {
             View card = findViewById(id);
             card.setOnFocusChangeListener((v, focused) -> {
-                if (focused) {
-                    v.animate().scaleX(1.08f).scaleY(1.08f).setDuration(150).start();
-                    v.setElevation(dp(16));
-                } else {
-                    v.animate().scaleX(1f).scaleY(1f).setDuration(150).start();
-                    v.setElevation(dp(4));
-                }
+                ObjectAnimator sx = ObjectAnimator.ofFloat(v, "scaleX", focused ? 1.08f : 1f);
+                ObjectAnimator sy = ObjectAnimator.ofFloat(v, "scaleY", focused ? 1.08f : 1f);
+                ObjectAnimator tz = ObjectAnimator.ofFloat(v, "translationZ", focused ? dp(12) : 0);
+                AnimatorSet set = new AnimatorSet();
+                set.playTogether(sx, sy, tz);
+                set.setDuration(180);
+                set.setInterpolator(interp);
+                set.start();
             });
         }
     }
@@ -861,8 +929,24 @@ public class MainActivity extends Activity {
             if (homeScreen.getVisibility() == View.GONE) showSearchDialog();
             return true;
         }
-        // D-pad scroll in WebView
-        if (webView.getVisibility() == View.VISIBLE && webView.hasFocus()) {
+        // Pointer mode: D-pad moves cursor, OK simulates click
+        if (pointerMode && webView.getVisibility() == View.VISIBLE) {
+            switch (keyCode) {
+                case KeyEvent.KEYCODE_DPAD_UP:
+                    moveCursorTo(cursor.x, cursor.y - CURSOR_STEP); return true;
+                case KeyEvent.KEYCODE_DPAD_DOWN:
+                    moveCursorTo(cursor.x, cursor.y + CURSOR_STEP); return true;
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                    moveCursorTo(cursor.x - CURSOR_STEP, cursor.y); return true;
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                    moveCursorTo(cursor.x + CURSOR_STEP, cursor.y); return true;
+                case KeyEvent.KEYCODE_DPAD_CENTER:
+                case KeyEvent.KEYCODE_ENTER:
+                    simulateClick(cursor.x, cursor.y); return true;
+            }
+        }
+        // D-pad scroll in WebView (normal mode)
+        if (!pointerMode && webView.getVisibility() == View.VISIBLE && webView.hasFocus()) {
             if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                 webView.evaluateJavascript("window.scrollBy(0,200)", null);
                 return true;
