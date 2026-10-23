@@ -1,5 +1,7 @@
-# Android build outputs
+# Android build outputs (except releases folder)
+releases/*.apk linguist-generated
 *.apk
+!releases/*.apk
 *.aab
 *.ap_
 *.dex
