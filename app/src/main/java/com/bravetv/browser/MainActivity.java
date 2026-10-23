@@ -450,9 +450,10 @@ public class MainActivity extends Activity {
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
             CookieManager.getInstance().setAcceptCookie(true);
         } else {
+            // Desktop Chrome UA for YouTube TV → enables 1080p/4K selection
             s.setUserAgentString(
-                "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) " +
-                "AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1");
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
             CookieManager.getInstance().setAcceptCookie(true);
         }
     }
@@ -478,9 +479,14 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(true);
         s.setAllowContentAccess(true);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
+        // Desktop Chrome UA → YouTube serves 1080p/4K instead of capping at 720p
         s.setUserAgentString(
-            "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) " +
-            "AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1");
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+        // Hint VP9/AV1 support for HD streams
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        }
 
         webView.addJavascriptInterface(new BraveTVInterface(), "BraveTV");
 
@@ -548,6 +554,39 @@ public class MainActivity extends Activity {
                     "if(sk)sk.click();" +
                     "if(document.querySelector('.ad-showing')){" +
                     "var v=document.querySelector('video');if(v)v.currentTime=v.duration;}},300);", null);
+
+                // Force highest available video quality (1080p → 4K)
+                view.evaluateJavascript(
+                    "(function(){" +
+                    "var QUALITIES=['hd2160','hd1440','hd1080','hd720'];" +
+                    "function forceHD(){" +
+                    // Standard YouTube web player
+                    "  var p=document.getElementById('movie_player');" +
+                    "  if(p){" +
+                    "    try{if(p.setPlaybackQualityRange)p.setPlaybackQualityRange('hd1080','hd2160');}catch(e){}" +
+                    "    try{if(p.setPlaybackQuality)p.setPlaybackQuality('hd1080');}catch(e){}" +
+                    "    try{" +
+                    "      var avail=p.getAvailableQualityLevels&&p.getAvailableQualityLevels();" +
+                    "      if(avail&&avail.length>0){" +
+                    "        for(var q=0;q<QUALITIES.length;q++){" +
+                    "          if(avail.indexOf(QUALITIES[q])>=0){" +
+                    "            p.setPlaybackQuality(QUALITIES[q]);break;}" +
+                    "        }" +
+                    "      }" +
+                    "    }catch(e){}" +
+                    "  }" +
+                    // YouTube TV interface player
+                    "  try{" +
+                    "    var yta=document.querySelector('ytlr-app')||document.querySelector('yt-app');" +
+                    "    if(yta&&window.yt&&window.yt.player){" +
+                    "      var pp=window.yt.player.Application.get();" +
+                    "      if(pp&&pp.setPlaybackQualityRange)pp.setPlaybackQualityRange('hd1080','hd2160');" +
+                    "    }" +
+                    "  }catch(e){}" +
+                    "}" +
+                    "forceHD();" +
+                    "setInterval(forceHD,4000);" +
+                    "})()", null);
 
                 // Region cookie
                 if (autoVpnEnabled && currentMode != NAV_INCOGNITO) {
