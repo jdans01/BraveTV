@@ -55,12 +55,10 @@ public class MainActivity extends Activity {
     // ─── Pointer / cursor mode ────────────────────────────────────────────────
     private boolean pointerMode = false;
     private View cursorDot;
-    private Button btnCursorToggle;
+    private android.widget.ImageButton btnCursorToggle;
+    private Button btnHideNav;
     private final PointF cursor = new PointF(640, 360);
     private static final int CURSOR_STEP = 32;
-    private final Runnable cursorHideRunnable = () -> {
-        if (cursorDot != null) cursorDot.setVisibility(View.GONE);
-    };
 
     // ─── Regiones ─────────────────────────────────────────────────────────────
     private static final String[] AUTO_REGIONS = {
@@ -370,9 +368,11 @@ public class MainActivity extends Activity {
         homeBlockCount = findViewById(R.id.homeBlockCount);
         btnRevealNav   = findViewById(R.id.btnRevealNav);
         btnRevealNav.setOnClickListener(v -> setNavBarHidden(false));
-        cursorDot      = findViewById(R.id.cursorDot);
+        cursorDot       = findViewById(R.id.cursorDot);
         btnCursorToggle = findViewById(R.id.btnCursor);
         btnCursorToggle.setOnClickListener(v -> togglePointerMode());
+        btnHideNav = findViewById(R.id.btnHideNav);
+        if (btnHideNav != null) btnHideNav.setOnClickListener(v -> setNavBarHidden(true));
 
         prefs = getSharedPreferences("bravetv", 0); // Context.MODE_PRIVATE = 0
         autoVpnEnabled = prefs.getBoolean("vpn", true);
@@ -391,22 +391,21 @@ public class MainActivity extends Activity {
     // ─── Pointer mode ─────────────────────────────────────────────────────────
     private void togglePointerMode() {
         pointerMode = !pointerMode;
+        // Highlight button when active
         if (btnCursorToggle != null) {
-            btnCursorToggle.setTextColor(pointerMode ? 0xFF4ADE80 : 0xFFC084FC);
+            btnCursorToggle.setAlpha(pointerMode ? 1f : 0.5f);
         }
         if (pointerMode) {
-            // Center cursor on screen
             webView.post(() -> {
                 cursor.set(webView.getWidth() / 2f, webView.getHeight() / 2f);
                 moveCursorTo(cursor.x, cursor.y);
                 cursorDot.setVisibility(View.VISIBLE);
             });
         } else {
-            handler.removeCallbacks(cursorHideRunnable);
             if (cursorDot != null) cursorDot.setVisibility(View.GONE);
         }
         Toast.makeText(this,
-            pointerMode ? "🖱️ Puntero activado — D-pad mueve, OK clic" : "🎮 D-pad normal",
+            pointerMode ? "🖱 Puntero ON — D-pad mueve · OK = clic" : "🎮 D-pad normal",
             Toast.LENGTH_SHORT).show();
     }
 
@@ -414,26 +413,28 @@ public class MainActivity extends Activity {
         if (cursorDot == null) return;
         int w = webView.getWidth();
         int h = webView.getHeight();
-        float cx = Math.max(0, Math.min(x, w));
-        float cy = Math.max(0, Math.min(y, h));
+        // Clamp keeping arrow tip inside screen
+        float cx = Math.max(0, Math.min(x, w - dp(28)));
+        float cy = Math.max(0, Math.min(y, h - dp(32)));
         cursor.set(cx, cy);
-        int dotW = cursorDot.getWidth();
-        int dotH = cursorDot.getHeight();
-        cursorDot.setX(cx - dotW / 2f);
-        cursorDot.setY(cy - dotH / 2f);
+        cursorDot.setX(cx);
+        cursorDot.setY(cy);
         cursorDot.setVisibility(View.VISIBLE);
-        handler.removeCallbacks(cursorHideRunnable);
-        handler.postDelayed(cursorHideRunnable, 3000);
+        cursorDot.setAlpha(1f);
     }
 
     private void simulateClick(float x, float y) {
         long now = android.os.SystemClock.uptimeMillis();
         MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x, y, 0);
-        MotionEvent up   = MotionEvent.obtain(now, now + 100, MotionEvent.ACTION_UP, x, y, 0);
+        MotionEvent up   = MotionEvent.obtain(now, now + 80, MotionEvent.ACTION_UP, x, y, 0);
         webView.dispatchTouchEvent(down);
         webView.dispatchTouchEvent(up);
         down.recycle();
         up.recycle();
+        // Pulse cursor to confirm click — stays visible
+        cursorDot.animate().scaleX(1.5f).scaleY(1.5f).setDuration(80)
+            .withEndAction(() -> cursorDot.animate().scaleX(1f).scaleY(1f).setDuration(80).start())
+            .start();
     }
 
     // ─── Card focus animations ────────────────────────────────────────────────
