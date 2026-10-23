@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mouse-style arrow cursor pointing top-left -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp"
+    android:height="32dp"
+    android:viewportWidth="28"
+    android:viewportHeight="32">
+
+    <!-- White fill -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M2,2 L2,24 L8,18 L13,28 L16,27 L11,17 L19,17 Z" />
+
+    <!-- Purple stroke outline -->
+    <path
+        android:strokeColor="#FFE040FB"
+        android:strokeWidth="1.5"
+        android:fillColor="#00000000"
+        android:pathData="M2,2 L2,24 L8,18 L13,28 L16,27 L11,17 L19,17 Z" />
+
+</vector>

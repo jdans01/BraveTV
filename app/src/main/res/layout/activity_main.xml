@@ -93,17 +93,34 @@
             android:nextFocusLeft="@id/urlBar"
             android:nextFocusRight="@id/btnCursor" />
 
-        <Button
+        <!-- Pointer/cursor toggle: arrow icon -->
+        <ImageButton
             android:id="@+id/btnCursor"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:text="&#128392;"
-            android:textColor="#C084FC"
-            android:textSize="14sp"
+            android:src="@drawable/cursor_arrow"
+            android:scaleX="0.85"
+            android:scaleY="0.85"
+            android:alpha="0.5"
             android:background="@drawable/btn_cursor"
             android:layout_marginStart="5dp"
             android:focusable="true"
             android:nextFocusLeft="@id/btnVpn"
+            android:nextFocusRight="@id/btnHideNav"
+            android:contentDescription="Modo puntero" />
+
+        <!-- Hide navbar button -->
+        <Button
+            android:id="@+id/btnHideNav"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:text="&#9650;"
+            android:textColor="#6B6B8A"
+            android:textSize="13sp"
+            android:background="@drawable/btn_nav"
+            android:layout_marginStart="4dp"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnCursor"
             android:nextFocusRight="@id/btnBack" />
 
         <Button
@@ -116,7 +133,7 @@
             android:background="@drawable/btn_nav"
             android:layout_marginStart="5dp"
             android:focusable="true"
-            android:nextFocusLeft="@id/btnCursor"
+            android:nextFocusLeft="@id/btnHideNav"
             android:nextFocusRight="@id/btnForward" />
 
         <Button
@@ -178,12 +195,12 @@
         android:focusableInTouchMode="true"
         android:visibility="gone" />
 
-    <!-- Virtual cursor dot for pointer mode -->
-    <View
+    <!-- Virtual arrow cursor for pointer mode -->
+    <ImageView
         android:id="@+id/cursorDot"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
-        android:background="@drawable/cursor_dot"
+        android:layout_width="28dp"
+        android:layout_height="32dp"
+        android:src="@drawable/cursor_arrow"
         android:elevation="20dp"
         android:visibility="gone" />
 
