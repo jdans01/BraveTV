@@ -1265,7 +1265,12 @@ public class MainActivity extends Activity {
                 setNavBarHidden(false);
                 return true;
             }
-            if (webView.canGoBack()) {
+            // On YouTube (TV or web) the SPA pushes a history entry on nearly every internal
+            // navigation, so webView.canGoBack() stays true almost forever — BACK would need
+            // dozens of presses to ever reach the menu. There, BACK always means "exit to menu";
+            // real page-history stepping only makes sense for actual browsing (Brave/incógnito).
+            boolean isYoutube = currentMode == NAV_YT_TV || currentMode == NAV_YT_WEB;
+            if (!isYoutube && webView.canGoBack()) {
                 webView.goBack();
             } else {
                 showHome();
