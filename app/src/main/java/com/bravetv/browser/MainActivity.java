@@ -78,27 +78,38 @@ public class MainActivity extends Activity {
 
     // ─── Ad block ─────────────────────────────────────────────────────────────
     private static final Set<String> AD_HOSTS = new HashSet<>(Arrays.asList(
-        "ad.youtube.com","ads.youtube.com","googleadservices.com",
-        "googlesyndication.com","doubleclick.net","googletagmanager.com",
-        "googletagservices.com","adservice.google.com","adservice.google.com.mx",
-        "imasdk.googleapis.com","pagead2.googlesyndication.com",
-        "tpc.googlesyndication.com","www.googleadservices.com",
-        "analytics.google.com","google-analytics.com","stats.g.doubleclick.net",
-        "cm.g.doubleclick.net","ad.doubleclick.net","securepubads.g.doubleclick.net",
-        "pubads.g.doubleclick.net","connect.facebook.net","graph.facebook.com",
-        "outbrain.com","taboola.com","moatads.com","amazon-adsystem.com",
-        "adsafeprotected.com","2mdn.net","adnxs.com",
-        // Additional ad/tracking domains
-        "yt3.ggpht.com","sb.scorecardresearch.com","pixel.quantserve.com",
-        "s.ytimg.com/yts/imgbin","static.doubleclick.net",
-        "survey.g.doubleclick.net","www.youtube-nocookie.com"
+        // Google ads / IMA SDK — bloquear IMA impide que el player cargue el anuncio de video
+        "imasdk.googleapis.com","ima.googleapis.com",
+        "ad.youtube.com","ads.youtube.com",
+        "googleadservices.com","www.googleadservices.com",
+        "googlesyndication.com","pagead2.googlesyndication.com",
+        "tpc.googlesyndication.com","adservice.google.com",
+        "adservice.google.com.mx","adservice.google.co",
+        "doubleclick.net","ad.doubleclick.net","stats.g.doubleclick.net",
+        "cm.g.doubleclick.net","securepubads.g.doubleclick.net",
+        "pubads.g.doubleclick.net","static.doubleclick.net",
+        "survey.g.doubleclick.net","2mdn.net",
+        "googletagmanager.com","googletagservices.com",
+        "analytics.google.com","google-analytics.com",
+        "connect.facebook.net","graph.facebook.com",
+        "outbrain.com","taboola.com","moatads.com",
+        "amazon-adsystem.com","adsafeprotected.com","adnxs.com",
+        "sb.scorecardresearch.com","pixel.quantserve.com",
+        "ade.googlesyndication.com","fundingchoicesmessages.google.com"
     ));
     private static final Set<String> AD_URL_PATTERNS = new HashSet<>(Arrays.asList(
-        "/pagead/","/ads/","/adview","ad_type=","doubleclick","/ptracking",
-        "/get_video_info?","googlevideo.com/videoplayback?ctier=L",
+        // YouTube ad video streams: ctier=L marca anuncio pre-roll/mid-roll
+        "ctier=L","ctier%3DL",
+        // YouTube ad tracking endpoints
         "youtube.com/api/stats/ads","youtube.com/pagead","youtube.com/ptracking",
-        "/api/stats/qoe?","/api/stats/atr?","/youtubei/v1/log_event",
-        "ad_video_id=","&ad_cpn=","ctier=L&","&oad=1","&adformat="
+        "youtube.com/get_video_info","youtube.com/api/stats/qoe",
+        "youtube.com/api/stats/atr","youtube.com/youtubei/v1/log_event",
+        "/pagead/","/ads/","/adview","ad_type=","doubleclick","/ptracking",
+        "ad_video_id=","&ad_cpn=","&oad=1","&adformat=","&adurl=",
+        // IMA SDK script paths
+        "/ima/","imasdk","imasdk",
+        // Consent / funding-choice dialogs
+        "fundingchoicesmessages","consent.youtube"
     ));
 
     private boolean isAdUrl(String url) {
@@ -564,45 +575,104 @@ public class MainActivity extends Activity {
 
     // ─── Ad blocker injection (called on page load AND on SPA navigation) ────
     private void injectAdBlocker(WebView view) {
-        // CSS: hide all ad containers
+        // ── Capa 1: CSS — oculta contenedores de anuncios ────────────────────
         view.evaluateJavascript(
             "(function(){" +
-            "if(document.getElementById('_btv_css')) return;" +
-            "var s=document.createElement('style');s.id='_btv_css';" +
-            "s.innerHTML=" +
-            "'ytd-display-ad-renderer,ytd-promoted-sparkles-web-renderer," +
-            "ytd-promoted-video-renderer,ytd-search-pyv-renderer," +
-            "ytd-banner-promo-renderer,ytd-statement-banner-renderer," +
-            ".ytp-ad-module,.ytp-ad-overlay-container,.ytp-ad-text-overlay," +
-            ".ytp-ad-skip-button-container+div,.video-ads,#player-ads," +
-            "ytm-promoted-sparkles-web-renderer,.ytd-mealbar-promo-renderer," +
-            "tp-yt-paper-dialog.ytd-popup-container," +
-            // YouTube TV ad overlays
-            "ytlr-ad-placement-renderer,.ytlr-ad-action-interstitial-renderer," +
-            ".ytlr-companion-slot,ytlr-mealbar-promo-renderer" +
-            "{display:none!important;visibility:hidden!important;}';" +
+            "var ID='_btv_css2';" +
+            "var ex=document.getElementById(ID);if(ex)ex.remove();" +
+            "var s=document.createElement('style');s.id=ID;" +
+            "s.textContent=[" +
+            // YouTube web — anuncios en resultados y sidebar
+            "'ytd-display-ad-renderer'," +
+            "'ytd-promoted-sparkles-web-renderer'," +
+            "'ytd-promoted-video-renderer'," +
+            "'ytd-search-pyv-renderer'," +
+            "'ytd-banner-promo-renderer'," +
+            "'ytd-statement-banner-renderer'," +
+            "'ytd-ad-slot-renderer'," +
+            "'ytd-in-feed-ad-layout-renderer'," +
+            "'ytd-action-companion-ad-renderer'," +
+            "'ytd-display-ad-renderer'," +
+            // YouTube web — player ads
+            "'.ytp-ad-module'," +
+            "'.ytp-ad-overlay-container'," +
+            "'.ytp-ad-text-overlay'," +
+            "'.ytp-ad-image-overlay'," +
+            "'.ytp-ad-persistent-progress-bar-container'," +
+            "'.ytp-ad-progress-list'," +
+            "'.ytp-ad-player-overlay'," +
+            "'.ytp-ad-player-overlay-instream-info'," +
+            "'.video-ads'," +
+            "'#player-ads'," +
+            "'#masthead-ad'," +
+            // Mealbar / surveys
+            "'.ytd-mealbar-promo-renderer'," +
+            "'ytm-promoted-sparkles-web-renderer'," +
+            // Consent/funding dialogs
+            "'tp-yt-paper-dialog.ytd-popup-container'," +
+            "'ytd-enforcement-message-view-model'," +
+            // YouTube TV (youtube.com/tv)
+            "'ytlr-ad-placement-renderer'," +
+            "'.ytlr-ad-action-interstitial-renderer'," +
+            "'.ytlr-companion-slot'," +
+            "'ytlr-mealbar-promo-renderer'," +
+            "'ytlr-skip-button-renderer'," +
+            // Generic
+            "'[id^=\"ad_\"]','[class*=\"-ad-\"]'" +
+            "].join(',')+" +
+            "'{display:none!important;visibility:hidden!important;max-height:0!important}';" +
             "document.head.appendChild(s);})()", null);
 
-        // JS: skip button + fast-forward video ads + mute while ad plays
+        // ── Capa 2: JS — skip/fast-forward anuncios de video ─────────────────
         view.evaluateJavascript(
             "(function(){" +
-            "if(window._btvSkip) return; window._btvSkip=true;" +
+            "if(window._btvSkip2) return; window._btvSkip2=true;" +
+            // Monkey-patch fetch/XHR para bloquear IMA en tiempo de ejecución
+            "var _oFetch=window.fetch;" +
+            "window.fetch=function(u,o){" +
+            "  if(typeof u==='string'&&(" +
+            "    u.indexOf('imasdk')>=0||u.indexOf('ctier=L')>=0||" +
+            "    u.indexOf('/pagead/')>=0||u.indexOf('fundingchoices')>=0))" +
+            "    return Promise.resolve(new Response('',{status:200}));" +
+            "  return _oFetch.apply(this,arguments);};" +
+            // Monkey-patch XMLHttpRequest
+            "var _oOpen=XMLHttpRequest.prototype.open;" +
+            "XMLHttpRequest.prototype.open=function(m,u){" +
+            "  if(u&&(u.indexOf('imasdk')>=0||u.indexOf('ctier=L')>=0||" +
+            "    u.indexOf('/pagead/')>=0)){" +
+            "    this._blocked=true;}" +
+            "  return _oOpen.apply(this,arguments);};" +
+            "var _oSend=XMLHttpRequest.prototype.send;" +
+            "XMLHttpRequest.prototype.send=function(){" +
+            "  if(this._blocked){this.abort();return;}" +
+            "  return _oSend.apply(this,arguments);};" +
+            // Loop: skip botón, fast-forward, dismiss interstitial
             "setInterval(function(){" +
-            // Click any skip button
             "  var sk=document.querySelector(" +
-            "    '.ytp-ad-skip-button,.ytp-skip-ad-button," +
-            "     .ytp-ad-skip-button-modern,ytlr-skip-ad-renderer button');" +
+            "    '.ytp-ad-skip-button,.ytp-skip-ad-button,.ytp-ad-skip-button-modern," +
+            "     .ytp-ad-skip-button-slot button,ytlr-skip-button-renderer button," +
+            "     button[class*=\"skip\"]');" +
             "  if(sk){sk.click();return;}" +
-            // If ad is showing, jump video to end
-            "  if(document.querySelector('.ad-showing,.ad-interrupting')){" +
+            // Fast-forward si hay anuncio de video
+            "  var adOn=document.querySelector(" +
+            "    '.ad-showing,.ad-interrupting,.ytp-ad-player-overlay');" +
+            "  if(adOn){" +
             "    var v=document.querySelector('video');" +
-            "    if(v&&v.duration>0&&!isNaN(v.duration)){" +
-            "      v.currentTime=v.duration;v.muted=false;}" +
+            "    if(v&&v.duration>0&&!isNaN(v.duration)&&v.duration<600){" +
+            "      v.playbackRate=16;v.currentTime=v.duration-0.1;}" +
+            "  } else {" +
+            "    var v2=document.querySelector('video');" +
+            "    if(v2&&v2.playbackRate>1)v2.playbackRate=1;" +
             "  }" +
-            // YouTube TV: dismiss interstitial ads
-            "  var btn=document.querySelector('[data-dismiss-interstitial]');" +
-            "  if(btn) btn.click();" +
-            "},250);})()", null);
+            // YouTube TV interstitial
+            "  var ib=document.querySelector(" +
+            "    '[data-dismiss-interstitial],ytlr-skip-button-renderer button," +
+            "     .ytlr-ad-action-interstitial-skip-button');" +
+            "  if(ib)ib.click();" +
+            // Remove ad overlay nodes that CSS didn't catch
+            "  var ad=document.querySelector('.ytp-ad-player-overlay,.ytp-ad-module');" +
+            "  if(ad&&ad.parentNode)ad.parentNode.removeChild(ad);" +
+            "},200);})()", null);
     }
 
     // ─── D-pad spatial navigation injection ──────────────────────────────────
