@@ -887,13 +887,11 @@ public class MainActivity extends Activity {
             "  else if(e.keyCode===39)dir='right';" +
             "  if(!dir)return;" +
             "  var cur=document.activeElement;" +
-            "  console.log('BTVDIAG dir='+dir+' cur='+(cur&&cur.tagName+'#'+cur.id)+' els='+getEls().length);" +
             "  if(!cur||cur===document.body){" +
             "    var els=getEls();if(els.length)els[0].focus();" +
             "    return;" +
             "  }" +
             "  var nxt=nearest(cur,dir);" +
-            "  console.log('BTVDIAG nxt='+(nxt&&(nxt.tagName+'#'+nxt.id)));" +
             "  if(nxt){nxt.focus();nxt.scrollIntoView({block:'nearest'});}" +
             "  else if(dir==='down')window.scrollBy(0,200);" +
             // Nothing above the current item (top of a video grid, etc.) — hand off to the
