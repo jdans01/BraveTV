@@ -23,9 +23,24 @@ import android.widget.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
+
+    private static final String BLOCKLIST_URL =
+        "https://raw.githubusercontent.com/jdans01/BraveTV/main/blocklist.txt";
+    private static final String PREF_BLOCKLIST      = "remote_blocklist";
+    private static final String PREF_BLOCKLIST_TIME = "remote_blocklist_time";
+    // Refresh every 6 hours
+    private static final long   BLOCKLIST_TTL_MS    = 6 * 60 * 60 * 1000L;
+
+    private final ExecutorService bgExecutor = Executors.newSingleThreadExecutor();
 
     private static final int NAV_BRAVE     = 0;
     private static final int NAV_INCOGNITO = 1;
@@ -77,6 +92,10 @@ public class MainActivity extends Activity {
     private static final int MAX_SWITCHES = AUTO_REGIONS.length;
 
     // ─── Ad block ─────────────────────────────────────────────────────────────
+    // Mutable sets — seeded from built-in list, overwritten by remote blocklist
+    private final Set<String> adHosts    = new HashSet<>();
+    private final Set<String> adPatterns = new HashSet<>();
+
     private static final Set<String> AD_HOSTS = new HashSet<>(Arrays.asList(
         // Google ads / IMA SDK — bloquear IMA impide que el player cargue el anuncio de video
         "imasdk.googleapis.com","ima.googleapis.com",
@@ -112,17 +131,69 @@ public class MainActivity extends Activity {
         "fundingchoicesmessages","consent.youtube"
     ));
 
+    // ── Seed mutable sets from built-in + cached remote list ─────────────────
+    private void initBlocklist() {
+        adHosts.addAll(AD_HOSTS);
+        adPatterns.addAll(AD_URL_PATTERNS);
+        // Apply cached remote list immediately (no network wait)
+        String cached = prefs.getString(PREF_BLOCKLIST, "");
+        if (!cached.isEmpty()) applyRemoteBlocklist(cached);
+        // Fetch fresh copy in background if TTL expired
+        long lastFetch = prefs.getLong(PREF_BLOCKLIST_TIME, 0);
+        if (System.currentTimeMillis() - lastFetch > BLOCKLIST_TTL_MS) {
+            fetchRemoteBlocklist();
+        }
+    }
+
+    private void fetchRemoteBlocklist() {
+        bgExecutor.execute(() -> {
+            try {
+                HttpURLConnection conn = (HttpURLConnection) new URL(BLOCKLIST_URL).openConnection();
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
+                conn.setRequestProperty("User-Agent", "BraveTVBrowser/1.0");
+                if (conn.getResponseCode() != 200) return;
+                StringBuilder sb = new StringBuilder();
+                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line).append("\n");
+                br.close();
+                conn.disconnect();
+                String content = sb.toString().trim();
+                if (content.isEmpty()) return;
+                prefs.edit()
+                    .putString(PREF_BLOCKLIST, content)
+                    .putLong(PREF_BLOCKLIST_TIME, System.currentTimeMillis())
+                    .apply();
+                handler.post(() -> applyRemoteBlocklist(content));
+            } catch (Exception ignored) {}
+        });
+    }
+
+    private void applyRemoteBlocklist(String content) {
+        Set<String> hosts    = new HashSet<>();
+        Set<String> patterns = new HashSet<>();
+        for (String raw : content.split("\n")) {
+            String line = raw.trim();
+            if (line.isEmpty() || line.startsWith("#")) continue;
+            if (line.startsWith("HOST:"))    hosts.add(line.substring(5).trim());
+            else if (line.startsWith("PATTERN:")) patterns.add(line.substring(8).trim());
+        }
+        if (!hosts.isEmpty())    { adHosts.clear();    adHosts.addAll(hosts); }
+        if (!patterns.isEmpty()) { adPatterns.clear(); adPatterns.addAll(patterns); }
+    }
+
     private boolean isAdUrl(String url) {
         if (url == null) return false;
         try {
             Uri uri = Uri.parse(url);
             String host = uri.getHost();
             if (host != null) {
-                if (AD_HOSTS.contains(host)) return true;
-                for (String h : AD_HOSTS)
-                    if (host.endsWith("." + h) || host.equals(h)) return true;
+                if (adHosts.contains(host)) return true;
+                for (String h : adHosts)
+                    if (host.endsWith("." + h)) return true;
             }
-            for (String p : AD_URL_PATTERNS) if (url.contains(p)) return true;
+            for (String p : adPatterns) if (url.contains(p)) return true;
         } catch (Exception ignored) {}
         return false;
     }
@@ -388,6 +459,7 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences("bravetv", 0); // Context.MODE_PRIVATE = 0
         autoVpnEnabled = prefs.getBoolean("vpn", true);
         regionIndex    = prefs.getInt("regionIdx", 0);
+        initBlocklist(); // seed built-in + load cached remote list
 
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
@@ -1151,6 +1223,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        bgExecutor.shutdown();
         webView.destroy();
     }
 }
