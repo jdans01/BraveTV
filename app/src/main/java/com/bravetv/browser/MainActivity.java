@@ -280,7 +280,6 @@ public class MainActivity extends Activity {
 
     // ─── Navbar auto-hide ─────────────────────────────────────────────────────
     private void setNavBarHidden(boolean hide) {
-        if (hide == navBarHidden) return;
         navBarHidden = hide;
         if (hide) {
             navBar.animate()
@@ -749,25 +748,25 @@ public class MainActivity extends Activity {
 
     // ─── D-pad spatial navigation injection ──────────────────────────────────
     private void injectDpadNavigation(WebView view) {
-        // Skip on YouTube TV — it has its own perfect D-pad engine
+        // Skip on YouTube (all variants) — it has its own D-pad engine; our listener breaks it
         String url = view.getUrl();
-        if (url != null && url.contains("youtube.com/tv")) return;
+        if (url != null && url.contains("youtube.com")) return;
 
+        // Only inject on non-YouTube pages (Brave Search, DuckDuckGo, generic web)
         view.evaluateJavascript(
             "(function(){" +
             "if(window._btvNav) return; window._btvNav=true;" +
 
-            // ── Style: highlight focused element ──────────────────────────
+            // Highlight focused element
             "var _st=document.createElement('style');_st.id='_btv_nav_css';" +
             "_st.innerHTML=" +
             "':focus{outline:3px solid #C084FC!important;outline-offset:2px!important;" +
             "border-radius:4px!important;box-shadow:0 0 0 6px rgba(192,132,252,0.25)!important;}'" +
             ";document.head.appendChild(_st);" +
 
-            // ── Focusable selector ────────────────────────────────────────
             "var SEL='a[href],button:not([disabled]),input:not([disabled])," +
-            "select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex=\"-1\"])," +
-            "[role=\"button\"],[role=\"link\"],[role=\"menuitem\"],[role=\"option\"]';" +
+            "select:not([disabled]),[tabindex]:not([tabindex=\"-1\"])," +
+            "[role=\"button\"],[role=\"link\"],[role=\"menuitem\"]';" +
 
             "function getEls(){" +
             "  return Array.from(document.querySelectorAll(SEL)).filter(function(e){" +
@@ -776,34 +775,25 @@ public class MainActivity extends Activity {
             "  });" +
             "}" +
 
-            // ── Spatial: find nearest element in a direction ──────────────
             "function nearest(cur,dir){" +
-            "  var els=getEls();" +
-            "  if(!els.length)return null;" +
-            "  var cr=cur.getBoundingClientRect();" +
-            "  var cx=cr.left+cr.width/2, cy=cr.top+cr.height/2;" +
+            "  var els=getEls(),cr=cur.getBoundingClientRect();" +
+            "  var cx=cr.left+cr.width/2,cy=cr.top+cr.height/2;" +
             "  var best=null,bestScore=Infinity;" +
             "  for(var i=0;i<els.length;i++){" +
-            "    var el=els[i]; if(el===cur)continue;" +
+            "    var el=els[i];if(el===cur)continue;" +
             "    var r=el.getBoundingClientRect();" +
-            "    var ex=r.left+r.width/2, ey=r.top+r.height/2;" +
-            "    var dx=ex-cx, dy=ey-cy;" +
-            "    var ok=false;" +
-            "    if(dir==='up'   &&dy<-8)ok=true;" +
-            "    if(dir==='down' &&dy>8) ok=true;" +
-            "    if(dir==='left' &&dx<-8)ok=true;" +
-            "    if(dir==='right'&&dx>8) ok=true;" +
+            "    var dx=r.left+r.width/2-cx,dy=r.top+r.height/2-cy;" +
+            "    var ok=(dir==='up'&&dy<-8)||(dir==='down'&&dy>8)||" +
+            "           (dir==='left'&&dx<-8)||(dir==='right'&&dx>8);" +
             "    if(!ok)continue;" +
-            "    // Weight: prefer aligned axis heavily" +
-            "    var primary=dir==='up'||dir==='down'?Math.abs(dy):Math.abs(dx);" +
-            "    var cross  =dir==='up'||dir==='down'?Math.abs(dx):Math.abs(dy);" +
-            "    var score=primary+cross*2;" +
-            "    if(score<bestScore){bestScore=score;best=el;}" +
+            "    var pri=(dir==='up'||dir==='down')?Math.abs(dy):Math.abs(dx);" +
+            "    var crs=(dir==='up'||dir==='down')?Math.abs(dx):Math.abs(dy);" +
+            "    var sc=pri+crs*2;if(sc<bestScore){bestScore=sc;best=el;}" +
             "  }" +
             "  return best;" +
             "}" +
 
-            // ── Key listener ──────────────────────────────────────────────
+            // Key listener — NO preventDefault so the page's own handlers still run
             "document.addEventListener('keydown',function(e){" +
             "  var dir=null;" +
             "  if(e.keyCode===38)dir='up';" +
@@ -813,16 +803,14 @@ public class MainActivity extends Activity {
             "  if(!dir)return;" +
             "  var cur=document.activeElement;" +
             "  if(!cur||cur===document.body){" +
-            // Nothing focused yet: pick the most visible element near center
-            "    var els=getEls();" +
-            "    if(els.length){els[0].focus();e.preventDefault();}" +
+            "    var els=getEls();if(els.length)els[0].focus();" +
             "    return;" +
             "  }" +
             "  var nxt=nearest(cur,dir);" +
-            "  if(nxt){nxt.focus();e.preventDefault();}" +
-            "  else if(dir==='down'){window.scrollBy(0,200);e.preventDefault();}" +
-            "  else if(dir==='up'){window.scrollBy(0,-200);e.preventDefault();}" +
-            "},true);" +
+            "  if(nxt)nxt.focus();" +
+            "  else if(dir==='down')window.scrollBy(0,200);" +
+            "  else if(dir==='up')window.scrollBy(0,-200);" +
+            "});" +  // no 'true' capture — let page handle first
 
             "})()", null);
     }
@@ -1177,30 +1165,16 @@ public class MainActivity extends Activity {
                     simulateClick(cursor.x, cursor.y); return true;
             }
         }
-        // Normal mode: forward D-pad as arrow key events so injected JS spatial nav handles them
-        if (!pointerMode && webView.getVisibility() == View.VISIBLE) {
-            int jsKey = -1;
-            switch (keyCode) {
-                case KeyEvent.KEYCODE_DPAD_UP:    jsKey = 38; break;
-                case KeyEvent.KEYCODE_DPAD_DOWN:  jsKey = 40; break;
-                case KeyEvent.KEYCODE_DPAD_LEFT:  jsKey = 37; break;
-                case KeyEvent.KEYCODE_DPAD_RIGHT: jsKey = 39; break;
-            }
-            if (jsKey != -1) {
-                final int k = jsKey;
-                webView.evaluateJavascript(
-                    "(function(){var e=new KeyboardEvent('keydown'," +
-                    "{bubbles:true,cancelable:true,keyCode:" + k + ",which:" + k + "});" +
-                    "document.dispatchEvent(e);})()", null);
+        // Only intercept D-pad when WebView has focus AND navbar is hidden.
+        // If navbar is visible, let super handle it so Android moves focus between buttons.
+        if (!pointerMode && webView.getVisibility() == View.VISIBLE && webView.hasFocus()) {
+            // Scroll only — let the page's own JS handle element focus (YouTube, etc.)
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                webView.evaluateJavascript("window.scrollBy(0,220)", null);
                 return true;
             }
-            // OK/Enter → click focused element
-            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                webView.evaluateJavascript(
-                    "(function(){var el=document.activeElement;" +
-                    "if(el&&el!==document.body){el.click();}else{" +
-                    "var a=document.querySelectorAll('a[href],button');" +
-                    "if(a.length)a[0].click();}})()", null);
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                webView.evaluateJavascript("window.scrollBy(0,-220)", null);
                 return true;
             }
         }
