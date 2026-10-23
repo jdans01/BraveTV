@@ -821,7 +821,7 @@ public class MainActivity extends Activity {
             "    }" +
             "  }" +
             "  walk(document);" +
-            "  return out.filter(function(e){" +
+            "  var vis=out.filter(function(e){" +
             "    var r=e.getBoundingClientRect();" +
             // YouTube's persistent left rail (Principal/Shorts/Suscripciones/Tú) sits only ~150px
             // wide but is much closer in raw pixel distance to anything near the top of the page
@@ -832,6 +832,32 @@ public class MainActivity extends Activity {
             // screen, and this rail needs a signed-in account for most of its items anyway.
             "    return r.width>0&&r.height>0&&r.top<window.innerHeight&&r.bottom>0&&r.left>160;" +
             "  });" +
+            "  if(location.hostname.indexOf('youtube.com')<0) return vis;" +
+            // A single video result is really ~6 separate matches under SEL (thumbnail, title
+            // link, channel avatar, channel name, subtitles badge, 3-dot menu, "X capítulos"
+            // expander) — without collapsing those, DOWN/UP crawled through one video's internal
+            // pieces instead of moving between videos, and most of those pieces don't even open
+            // the video. Reduce every *-video-renderer card down to just its thumbnail link (the
+            // one target that actually opens the video), keeping non-card matches (filter chips,
+            // etc.) untouched.
+            "  function cardOf(el){" +
+            "    var n=el;" +
+            "    while(n){" +
+            "      if(n.tagName&&/^(YTD-VIDEO-RENDERER|YTD-RICH-ITEM-RENDERER|YTD-COMPACT-VIDEO-RENDERER|" +
+            "YTD-REEL-ITEM-RENDERER|YTD-GRID-VIDEO-RENDERER)$/.test(n.tagName))return n;" +
+            "      if(n.parentElement)n=n.parentElement;" +
+            "      else{var rt=n.getRootNode&&n.getRootNode();n=(rt&&rt.host)?rt.host:null;}" +
+            "    }" +
+            "    return null;" +
+            "  }" +
+            "  var cardsSeen=[],result=[];" +
+            "  for(var i=0;i<vis.length;i++){" +
+            "    var e=vis[i],c=cardOf(e);" +
+            "    if(!c){result.push(e);continue;}" +
+            "    if(e.id!=='thumbnail')continue;" +
+            "    if(cardsSeen.indexOf(c)===-1){cardsSeen.push(c);result.push(e);}" +
+            "  }" +
+            "  return result;" +
             "}" +
 
             "function nearest(cur,dir){" +
@@ -1141,6 +1167,19 @@ public class MainActivity extends Activity {
                 doSearch(input);
             }
             return true;
+        });
+
+        // D-pad focus alone (just passing through on the way to another button) used to be
+        // enough to pop the keyboard open on urlBar, since EditText shows the IME on any focus
+        // by default. Block that and only show it for an actual activation — a touch tap, or
+        // pressing OK/Enter while urlBar is the focused view (View.performClick() fires the
+        // same click listener either way, which is the right TV-remote equivalent of a tap).
+        urlBar.setShowSoftInputOnFocus(false);
+        urlBar.setOnClickListener(v -> {
+            urlBar.requestFocus();
+            android.view.inputmethod.InputMethodManager imm =
+                (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) imm.showSoftInput(urlBar, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
         });
     }
 
