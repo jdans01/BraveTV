@@ -1,0 +1,69 @@
+name: Update Blocklist
+
+on:
+  schedule:
+    # Cada lunes a las 03:00 UTC
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Forzar actualización aunque no haya cambios'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run updater script
+        run: python scripts/update_blocklist.py
+
+      - name: Check for changes
+        id: diff
+        run: |
+          git diff --quiet blocklist.txt && echo "changed=false" >> $GITHUB_OUTPUT || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Count new entries
+        if: steps.diff.outputs.changed == 'true'
+        id: count
+        run: |
+          ADDED=$(git diff blocklist.txt | grep '^+HOST:' | wc -l | tr -d ' ')
+          REMOVED=$(git diff blocklist.txt | grep '^-HOST:' | wc -l | tr -d ' ')
+          echo "added=$ADDED" >> $GITHUB_OUTPUT
+          echo "removed=$REMOVED" >> $GITHUB_OUTPUT
+
+      - name: Commit and push
+        if: steps.diff.outputs.changed == 'true' || github.event.inputs.force == 'true'
+        run: |
+          git config user.name  "BraveTV Blocklist Bot"
+          git config user.email "noreply@github.com"
+          DATE=$(date -u +"%Y-%m-%d")
+          ADDED="${{ steps.count.outputs.added }}"
+          REMOVED="${{ steps.count.outputs.removed }}"
+          MSG="chore(blocklist): auto-update ${DATE}"
+          if [ -n "$ADDED" ] && [ "$ADDED" -gt 0 ]; then
+            MSG="${MSG} (+${ADDED} dominios)"
+          fi
+          if [ -n "$REMOVED" ] && [ "$REMOVED" -gt 0 ]; then
+            MSG="${MSG} (-${REMOVED} dominios)"
+          fi
+          git add blocklist.txt
+          git commit -m "$MSG"
+          git push origin main
+
+      - name: No changes
+        if: steps.diff.outputs.changed == 'false'
+        run: echo "✓ blocklist.txt ya está actualizada — sin cambios"
