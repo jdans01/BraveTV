@@ -6,6 +6,26 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
+## [2.0] — 2026-10
+
+### Añadido
+- Selección de video por video con D-pad Arriba/Abajo en resultados de búsqueda de YouTube (antes solo se podía navegar lateralmente entre los filtros)
+- Navegación propia inyectada también en YouTube escritorio (no solo `/tv`), ya que el interstitial de "descargá la app" casi siempre redirige ahí
+- Cada tarjeta de video se selecciona como una sola unidad (miniatura completa), sin caer en cada sub-elemento (avatar del canal, botón de subtítulos, menú de tres puntos)
+
+### Cambiado
+- ATRÁS ahora vuelve directo al menú principal desde YouTube, en vez de navegar sin fin por el historial interno de la SPA de YouTube
+- La barra de URL solo entra en modo edición con un clic/OK explícito, ya no simplemente al pasar el foco con las flechas
+
+### Corregido
+- Choque con la política de seguridad Trusted Types de YouTube que rompía el script de navegación silenciosamente (`innerHTML` → `textContent`)
+- Condición de carrera que podía dejar una página sin respuesta a las flechas de forma intermitente, sin ningún error visible
+- `document.activeElement` no reflejaba el foco real dentro del Shadow DOM de las tarjetas de video de YouTube, rompiendo tanto el cálculo de "siguiente video" como la selección con OK/Enter
+- Abrir un enlace desde "Recientes" perdía el modo YouTube, rompiendo el comportamiento de ATRÁS para esos casos
+- El foco del WebView se perdía después de cualquier búsqueda, dejando las flechas sin respuesta
+
+---
+
 ## [1.1.0] — 2024-10
 
 ### Añadido
