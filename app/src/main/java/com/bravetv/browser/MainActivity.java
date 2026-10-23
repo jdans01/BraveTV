@@ -791,12 +791,11 @@ public class MainActivity extends Activity {
         if (url != null && url.contains("youtube.com/tv")) return;
         view.evaluateJavascript(
             "(function(){" +
-            "if(window._btvNav){console.log('BTVDIAG already injected');return;} window._btvNav=true;" +
-            "console.log('BTVDIAG injected on '+location.href);" +
+            "if(window._btvNav) return; window._btvNav=true;" +
 
             // Highlight focused element
             "var _st=document.createElement('style');_st.id='_btv_nav_css';" +
-            "_st.innerHTML=" +
+            "_st.textContent=" +
             "':focus{outline:3px solid #C084FC!important;outline-offset:2px!important;" +
             "border-radius:4px!important;box-shadow:0 0 0 6px rgba(192,132,252,0.25)!important;}'" +
             ";document.head.appendChild(_st);" +
@@ -854,15 +853,12 @@ public class MainActivity extends Activity {
             "  else if(e.keyCode===37)dir='left';" +
             "  else if(e.keyCode===39)dir='right';" +
             "  if(!dir)return;" +
-            "  console.log('BTVDIAG key '+dir+' active='+(document.activeElement&&document.activeElement.tagName));" +
             "  var cur=document.activeElement;" +
             "  if(!cur||cur===document.body){" +
-            "    var els=getEls();console.log('BTVDIAG els.length='+els.length);" +
-            "    if(els.length)els[0].focus();" +
+            "    var els=getEls();if(els.length)els[0].focus();" +
             "    return;" +
             "  }" +
             "  var nxt=nearest(cur,dir);" +
-            "  console.log('BTVDIAG nxt='+(nxt&&(nxt.tagName+'.'+nxt.className)));" +
             "  if(nxt){nxt.focus();nxt.scrollIntoView({block:'nearest'});}" +
             "  else if(dir==='down')window.scrollBy(0,200);" +
             // Nothing above the current item (top of a video grid, etc.) — hand off to the
@@ -1050,12 +1046,6 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int p) { progressBar.setProgress(p); }
-
-            @Override
-            public boolean onConsoleMessage(android.webkit.ConsoleMessage cm) {
-                android.util.Log.d("BTVDIAG", cm.message());
-                return true;
-            }
 
             @Override
             public void onShowCustomView(View view, CustomViewCallback cb) {
