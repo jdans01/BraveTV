@@ -276,6 +276,18 @@ public class MainActivity extends Activity {
         public void onFullscreen(boolean full) {
             handler.post(() -> setNavBarHidden(full));
         }
+        @JavascriptInterface
+        public void onEdgeReached(String dir) {
+            // The page's own item-by-item spatial nav (nearest(), in injectDpadNavigation)
+            // found nothing further in that direction — currently only "up" is wired, to hand
+            // off to the native navbar once you're at the top of a video grid / page.
+            if ("up".equals(dir)) handler.post(() -> escapeToNavbarFocus());
+        }
+    }
+
+    private void escapeToNavbarFocus() {
+        View first = findViewById(R.id.btnSearch);
+        if (first != null) first.requestFocus();
     }
 
     // ─── Navbar auto-hide ─────────────────────────────────────────────────────
@@ -627,7 +639,8 @@ public class MainActivity extends Activity {
 
         applyRegionCookies();
         updateVpnButton();
-        loadUrl(url);
+        if (mode == NAV_YT_TV || mode == NAV_YT_WEB) loadUrlFromBraveSearch(url);
+        else loadUrl(url);
         handler.postDelayed(() -> webView.requestFocus(), 350);
     }
 
@@ -823,9 +836,12 @@ public class MainActivity extends Activity {
             "    return;" +
             "  }" +
             "  var nxt=nearest(cur,dir);" +
-            "  if(nxt)nxt.focus();" +
+            "  if(nxt){nxt.focus();nxt.scrollIntoView({block:'nearest'});}" +
             "  else if(dir==='down')window.scrollBy(0,200);" +
-            "  else if(dir==='up')window.scrollBy(0,-200);" +
+            // Nothing above the current item (top of a video grid, etc.) — hand off to the
+            // native navbar instead of just eating the key. See onEdgeReached below.
+            "  else if(dir==='up'){if(typeof BraveTV!=='undefined')BraveTV.onEdgeReached('up');" +
+            "    else window.scrollBy(0,-200);}" +
             "});" +  // no 'true' capture — let page handle first
 
             "})()", null);
@@ -1152,6 +1168,20 @@ public class MainActivity extends Activity {
         urlBar.setText(url);
     }
 
+    // Arriving at YouTube with a Referer that looks like organic search traffic (as if you'd
+    // searched for it from Brave Search) instead of a bare direct hit — the thing more likely to
+    // read as "an app, not a browser" and trigger the "download the app" interstitial. Doesn't
+    // guarantee YouTube won't still show it (that's their own server-side detection, not
+    // something a Referer header can fully defeat), but it's the one real lever available here,
+    // so worth doing. Only matters on the first request — SPA navigation after that doesn't
+    // re-send Referer anyway.
+    private void loadUrlFromBraveSearch(String url) {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Referer", "https://search.brave.com/search?q=youtube");
+        webView.loadUrl(url, headers);
+        urlBar.setText(url);
+    }
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         // Whatever ends up handling a key — WebView's own native scroll on DPAD_UP, a focused
@@ -1174,20 +1204,37 @@ public class MainActivity extends Activity {
             return true;
         }
 
-        // WebView has its own default arrow-key handling (native page scroll) and consumes
-        // DPAD_UP via the view hierarchy before Activity.onKeyDown's fallback ever runs —
-        // confirmed on-device: a Log.d placed in onKeyDown's UP branch never once fired for a
-        // real key press, only for keys (LEFT/RIGHT/CENTER/BACK/SEARCH) WebView doesn't claim
-        // natively. Has to be caught one level higher, here, before super hands it to the view
-        // tree, or the native navbar (lupa/back/forward/cursor/▲) is never reachable by remote.
-        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getKeyCode() == KeyEvent.KEYCODE_DPAD_UP
+        // DPAD_UP/DOWN specifically: WebView's own default key handling (native page scroll)
+        // consumes both via the view hierarchy before Activity.onKeyDown's fallback ever runs —
+        // confirmed on-device for UP with a Log.d that never fired on a real key press.
+        // LEFT/RIGHT/CENTER don't suffer this (WebView has no native behavior for those absent a
+        // text input) and are forwarded from onKeyDown below as before.
+        //
+        // Forwarded into the page the same way as LEFT/RIGHT, instead of a native scrollBy, so
+        // the page's own item-by-item nearest() (injectDpadNavigation) selects the next/previous
+        // video rather than scrolling by a fixed pixel amount — "uno a uno", not a blind jump.
+        // DOWN still falls back to scrollBy when nearest() finds nothing (reaching the bottom of
+        // a loaded grid / a plain long page). UP's "nothing above" case calls back into
+        // escapeToNavbarFocus() via BraveTV.onEdgeReached('up') instead — see that method.
+        int keyCode = event.getKeyCode();
+        if (event.getAction() == KeyEvent.ACTION_DOWN
+                && (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN)
                 && !pointerMode && webView.getVisibility() == View.VISIBLE && webView.hasFocus()) {
-            // navBarHidden is already false here — the reveal check above caught that case.
-            View first = findViewById(R.id.btnSearch);
-            if (first != null) first.requestFocus();
+            dispatchSyntheticKey(keyCode == KeyEvent.KEYCODE_DPAD_UP ? 38 : 40);
             return true;
         }
+
         return super.dispatchKeyEvent(event);
+    }
+
+    // keyCode on a KeyboardEventInit is spec-inert in Chromium (read-only, meant to come from the
+    // real native event) — defineProperty is the only way to actually set it post-construct.
+    private void dispatchSyntheticKey(int jsKey) {
+        webView.evaluateJavascript(
+            "(function(){var e=new KeyboardEvent('keydown',{bubbles:true,cancelable:true});" +
+            "Object.defineProperty(e,'keyCode',{get:function(){return " + jsKey + ";}});" +
+            "Object.defineProperty(e,'which',{get:function(){return " + jsKey + ";}});" +
+            "document.dispatchEvent(e);})()", null);
     }
 
     @Override
@@ -1232,28 +1279,17 @@ public class MainActivity extends Activity {
         // Only intercept D-pad when WebView has focus AND navbar is hidden.
         // If navbar is visible, let super handle it so Android moves focus between buttons.
         if (!pointerMode && webView.getVisibility() == View.VISIBLE && webView.hasFocus()) {
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                webView.evaluateJavascript("window.scrollBy(0,220)", null);
-                return true;
-            }
-            // DPAD_UP is handled in dispatchKeyEvent() — WebView consumes it there before this
-            // method ever runs (see that override for why).
-            // LEFT/RIGHT/CENTER: Activity's default View.FocusFinder only walks native Android
-            // views, so once the navbar is hidden there's nothing else for it to land on and
-            // the key just dies here — confirmed on-device (stuck past the first focused page
-            // element, Buscar/Duck.ai/☰ all unreachable). The page's own injectDpadNavigation()
-            // listener is what actually walks focus between page elements, so these three still
-            // need to be forwarded into it as a synthetic DOM event, same as before. keyCode on
-            // a KeyboardEventInit is spec-inert in Chromium (read-only, meant to come from the
-            // real native event) — defineProperty is the only way to actually set it post-construct.
+            // DPAD_UP/DOWN are handled in dispatchKeyEvent() — WebView consumes those natively
+            // before this method ever runs (see that override for why).
+            // LEFT/RIGHT: Activity's default View.FocusFinder only walks native Android views,
+            // so once the navbar is hidden there's nothing else for it to land on and the key
+            // just dies here — confirmed on-device (stuck past the first focused page element,
+            // Buscar/Duck.ai/☰ all unreachable). The page's own injectDpadNavigation() listener
+            // is what actually walks focus between page elements, so these still need forwarding.
             int jsKey = keyCode == KeyEvent.KEYCODE_DPAD_LEFT ? 37
                 : keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? 39 : -1;
             if (jsKey != -1) {
-                webView.evaluateJavascript(
-                    "(function(){var e=new KeyboardEvent('keydown',{bubbles:true,cancelable:true});" +
-                    "Object.defineProperty(e,'keyCode',{get:function(){return " + jsKey + ";}});" +
-                    "Object.defineProperty(e,'which',{get:function(){return " + jsKey + ";}});" +
-                    "document.dispatchEvent(e);})()", null);
+                dispatchSyntheticKey(jsKey);
                 return true;
             }
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
