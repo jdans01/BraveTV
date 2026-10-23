@@ -91,6 +91,19 @@
             android:layout_marginStart="6dp"
             android:focusable="true"
             android:nextFocusLeft="@id/urlBar"
+            android:nextFocusRight="@id/btnCursor" />
+
+        <Button
+            android:id="@+id/btnCursor"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:text="&#128392;"
+            android:textColor="#C084FC"
+            android:textSize="14sp"
+            android:background="@drawable/btn_cursor"
+            android:layout_marginStart="5dp"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnVpn"
             android:nextFocusRight="@id/btnBack" />
 
         <Button
@@ -103,7 +116,7 @@
             android:background="@drawable/btn_nav"
             android:layout_marginStart="5dp"
             android:focusable="true"
-            android:nextFocusLeft="@id/btnVpn"
+            android:nextFocusLeft="@id/btnCursor"
             android:nextFocusRight="@id/btnForward" />
 
         <Button
@@ -165,6 +178,15 @@
         android:focusableInTouchMode="true"
         android:visibility="gone" />
 
+    <!-- Virtual cursor dot for pointer mode -->
+    <View
+        android:id="@+id/cursorDot"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:background="@drawable/cursor_dot"
+        android:elevation="20dp"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/statusText"
         android:layout_width="wrap_content"
@@ -219,10 +241,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingTop="28dp"
+            android:paddingTop="@dimen/tv_margin_v"
             android:paddingBottom="36dp"
-            android:paddingStart="48dp"
-            android:paddingEnd="48dp">
+            android:paddingStart="@dimen/tv_margin_h"
+            android:paddingEnd="@dimen/tv_margin_h">
 
             <!-- ── Cabecera ── -->
             <LinearLayout
@@ -305,9 +327,9 @@
                 <LinearLayout
                     android:id="@+id/cardBrave"
                     android:layout_width="0dp"
-                    android:layout_height="200dp"
+                    android:layout_height="@dimen/card_height"
                     android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
+                    android:layout_marginEnd="@dimen/card_gap"
                     android:background="@drawable/card_mode"
                     android:orientation="vertical"
                     android:gravity="center"
@@ -351,9 +373,9 @@
                 <LinearLayout
                     android:id="@+id/cardTor"
                     android:layout_width="0dp"
-                    android:layout_height="200dp"
+                    android:layout_height="@dimen/card_height"
                     android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
+                    android:layout_marginEnd="@dimen/card_gap"
                     android:background="@drawable/card_mode"
                     android:orientation="vertical"
                     android:gravity="center"
@@ -397,9 +419,9 @@
                 <LinearLayout
                     android:id="@+id/cardYtTv"
                     android:layout_width="0dp"
-                    android:layout_height="200dp"
+                    android:layout_height="@dimen/card_height"
                     android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
+                    android:layout_marginEnd="@dimen/card_gap"
                     android:background="@drawable/card_mode"
                     android:orientation="vertical"
                     android:gravity="center"
@@ -443,7 +465,7 @@
                 <LinearLayout
                     android:id="@+id/cardYtWeb"
                     android:layout_width="0dp"
-                    android:layout_height="200dp"
+                    android:layout_height="@dimen/card_height"
                     android:layout_weight="1"
                     android:background="@drawable/card_mode"
                     android:orientation="vertical"
@@ -503,8 +525,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="-48dp"
                 android:layout_marginEnd="-48dp"
-                android:paddingStart="48dp"
-                android:paddingEnd="48dp"
+                android:paddingStart="@dimen/tv_margin_h"
+                android:paddingEnd="@dimen/tv_margin_h"
                 android:scrollbars="none"
                 android:clipToPadding="false">
 

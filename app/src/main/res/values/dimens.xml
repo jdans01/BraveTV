@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TV safe-zone margins (Android TV Leanback standard) -->
+    <dimen name="tv_margin_h">48dp</dimen>
+    <dimen name="tv_margin_v">27dp</dimen>
+
+    <!-- Card dimensions -->
+    <dimen name="card_height">204dp</dimen>
+    <dimen name="card_gap">12dp</dimen>
+    <dimen name="card_icon">64dp</dimen>
+
+    <!-- Recent cards -->
+    <dimen name="recent_card_w">188dp</dimen>
+    <dimen name="recent_card_h">116dp</dimen>
+</resources>
