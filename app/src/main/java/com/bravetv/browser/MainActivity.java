@@ -859,11 +859,15 @@ public class MainActivity extends Activity {
             "    }" +
             "    return null;" +
             "  }" +
+            // Keep whichever SEL match comes first for a given card (walk/DOM order - almost
+            // always the thumbnail link, since ytd-thumbnail is the first child in these
+            // templates) rather than requiring a specific id. YouTube's markup drifts across
+            // versions/experiments; a hardcoded id="thumbnail" check silently matched nothing on
+            // this account's variant and dropped every video from the list entirely.
             "  var cardsSeen=[],result=[];" +
             "  for(var i=0;i<vis.length;i++){" +
             "    var e=vis[i],c=cardOf(e);" +
             "    if(!c){result.push(e);continue;}" +
-            "    if(e.id!=='thumbnail')continue;" +
             "    if(cardsSeen.indexOf(c)===-1){cardsSeen.push(c);result.push(e);}" +
             "  }" +
             "  return result;" +
