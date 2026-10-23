@@ -276,6 +276,18 @@ public class MainActivity extends Activity {
         public void onFullscreen(boolean full) {
             handler.post(() -> setNavBarHidden(full));
         }
+        @JavascriptInterface
+        public void onEdgeReached(String dir) {
+            // The page's own item-by-item spatial nav (nearest(), in injectDpadNavigation)
+            // found nothing further in that direction — currently only "up" is wired, to hand
+            // off to the native navbar once you're at the top of a video grid / page.
+            if ("up".equals(dir)) handler.post(() -> escapeToNavbarFocus());
+        }
+    }
+
+    private void escapeToNavbarFocus() {
+        View first = findViewById(R.id.btnSearch);
+        if (first != null) first.requestFocus();
     }
 
     // ─── Navbar auto-hide ─────────────────────────────────────────────────────
@@ -426,9 +438,12 @@ public class MainActivity extends Activity {
 
         String finalUrl = url;
         card.setOnClickListener(v -> {
-            currentMode = NAV_BRAVE;
+            // Hardcoding NAV_BRAVE here used to mislabel reopened YouTube pages, which broke the
+            // YouTube-specific BACK-to-menu handling below (isYoutube in onKeyDown) for anything
+            // reopened from Recientes.
+            currentMode = finalUrl.contains("youtube.com") ? NAV_YT_WEB : NAV_BRAVE;
             showBrowser();
-            configureWebViewForMode(NAV_BRAVE);
+            configureWebViewForMode(currentMode);
             applyRegionCookies();
             updateVpnButton();
             loadUrl(applyRegion(finalUrl));
@@ -627,7 +642,8 @@ public class MainActivity extends Activity {
 
         applyRegionCookies();
         updateVpnButton();
-        loadUrl(url);
+        if (mode == NAV_YT_TV || mode == NAV_YT_WEB) loadUrlFromBraveSearch(url);
+        else loadUrl(url);
         handler.postDelayed(() -> webView.requestFocus(), 350);
     }
 
@@ -764,18 +780,31 @@ public class MainActivity extends Activity {
 
     // ─── D-pad spatial navigation injection ──────────────────────────────────
     private void injectDpadNavigation(WebView view) {
-        // Skip on YouTube (all variants) — it has its own D-pad engine; our listener breaks it
+        // Only the real youtube.com/tv interface (ytlr-app) has its own working D-pad engine —
+        // injecting here would fight it. But the "download the app" interstitial on this TV
+        // reliably bounces /tv over to plain desktop youtube.com instead (confirmed on-device),
+        // and desktop YouTube's arrow-key handling is just a roving-tabindex widget on the
+        // Todo/Shorts/.../Filtros chip row at the top — arrows move sideways through the chips
+        // and never escape into the video grid below, so DOWN/selecting a video never worked
+        // there. Inject on every YouTube page except the actual /tv interface.
         String url = view.getUrl();
-        if (url != null && url.contains("youtube.com")) return;
-
-        // Only inject on non-YouTube pages (Brave Search, DuckDuckGo, generic web)
+        if (url != null && url.contains("youtube.com/tv")) return;
         view.evaluateJavascript(
             "(function(){" +
-            "if(window._btvNav) return; window._btvNav=true;" +
+            "if(window._btvNav) return;" +
+            // This can run before <head> exists yet (called right after shouldOverrideUrlLoading
+            // fires, ahead of the new document settling) — appendChild below would then throw on
+            // a null document.head. That happened AFTER the window._btvNav=true guard used to be
+            // set, which poisoned it: every later re-injection attempt (onPageFinished, the
+            // 1200ms delayed retry) saw the flag already true and skipped entirely, so the
+            // keydown listener never got attached at all for the rest of that page's life.
+            // Bail out without setting the flag so the next retry can actually succeed.
+            "if(!document.head) return;" +
+            "window._btvNav=true;" +
 
             // Highlight focused element
             "var _st=document.createElement('style');_st.id='_btv_nav_css';" +
-            "_st.innerHTML=" +
+            "_st.textContent=" +
             "':focus{outline:3px solid #C084FC!important;outline-offset:2px!important;" +
             "border-radius:4px!important;box-shadow:0 0 0 6px rgba(192,132,252,0.25)!important;}'" +
             ";document.head.appendChild(_st);" +
@@ -784,11 +813,64 @@ public class MainActivity extends Activity {
             "select:not([disabled]),[tabindex]:not([tabindex=\"-1\"])," +
             "[role=\"button\"],[role=\"link\"],[role=\"menuitem\"]';" +
 
+            // Plain querySelectorAll never sees inside a shadow root. YouTube's video cards are
+            // Polymer custom elements (ytd-video-renderer etc.) with open shadow roots, so the
+            // old light-DOM-only query found zero of them there — nearest() always returned null
+            // on YouTube specifically, even though the same code worked fine on plain-DOM sites
+            // like DuckDuckGo. Walk every element's shadowRoot too (open roots only; a closed one
+            // is unreachable from here by design, YouTube doesn't use those).
             "function getEls(){" +
-            "  return Array.from(document.querySelectorAll(SEL)).filter(function(e){" +
+            "  var out=[];" +
+            "  function walk(root){" +
+            "    var all=root.querySelectorAll('*');" +
+            "    for(var i=0;i<all.length;i++){" +
+            "      var e=all[i];" +
+            "      if(e.matches&&e.matches(SEL))out.push(e);" +
+            "      if(e.shadowRoot)walk(e.shadowRoot);" +
+            "    }" +
+            "  }" +
+            "  walk(document);" +
+            "  var vis=out.filter(function(e){" +
             "    var r=e.getBoundingClientRect();" +
-            "    return r.width>0&&r.height>0&&r.top<window.innerHeight&&r.bottom>0;" +
+            // YouTube's persistent left rail (Principal/Shorts/Suscripciones/Tú) sits only ~150px
+            // wide but is much closer in raw pixel distance to anything near the top of the page
+            // than the actual content below/right of it is — nearest()'s distance scoring kept
+            // picking the rail over the video grid, so DOWN from the filter chips just ping-ponged
+            // between a chip and the rail and could never reach a single video. Excluding it is
+            // a fair trade since BraveTV's own navbar already has its own way back to the home
+            // screen, and this rail needs a signed-in account for most of its items anyway.
+            "    return r.width>0&&r.height>0&&r.top<window.innerHeight&&r.bottom>0&&r.left>160;" +
             "  });" +
+            "  if(location.hostname.indexOf('youtube.com')<0) return vis;" +
+            // A single video result is really ~6 separate matches under SEL (thumbnail, title
+            // link, channel avatar, channel name, subtitles badge, 3-dot menu, "X capítulos"
+            // expander) — without collapsing those, DOWN/UP crawled through one video's internal
+            // pieces instead of moving between videos, and most of those pieces don't even open
+            // the video. Reduce every *-video-renderer card down to just its thumbnail link (the
+            // one target that actually opens the video), keeping non-card matches (filter chips,
+            // etc.) untouched.
+            "  function cardOf(el){" +
+            "    var n=el;" +
+            "    while(n){" +
+            "      if(n.tagName&&/^(YTD-VIDEO-RENDERER|YTD-RICH-ITEM-RENDERER|YTD-COMPACT-VIDEO-RENDERER|" +
+            "YTD-REEL-ITEM-RENDERER|YTD-GRID-VIDEO-RENDERER)$/.test(n.tagName))return n;" +
+            "      if(n.parentElement)n=n.parentElement;" +
+            "      else{var rt=n.getRootNode&&n.getRootNode();n=(rt&&rt.host)?rt.host:null;}" +
+            "    }" +
+            "    return null;" +
+            "  }" +
+            // Keep whichever SEL match comes first for a given card (walk/DOM order - almost
+            // always the thumbnail link, since ytd-thumbnail is the first child in these
+            // templates) rather than requiring a specific id. YouTube's markup drifts across
+            // versions/experiments; a hardcoded id="thumbnail" check silently matched nothing on
+            // this account's variant and dropped every video from the list entirely.
+            "  var cardsSeen=[],result=[];" +
+            "  for(var i=0;i<vis.length;i++){" +
+            "    var e=vis[i],c=cardOf(e);" +
+            "    if(!c){result.push(e);continue;}" +
+            "    if(cardsSeen.indexOf(c)===-1){cardsSeen.push(c);result.push(e);}" +
+            "  }" +
+            "  return result;" +
             "}" +
 
             "function nearest(cur,dir){" +
@@ -817,15 +899,25 @@ public class MainActivity extends Activity {
             "  else if(e.keyCode===37)dir='left';" +
             "  else if(e.keyCode===39)dir='right';" +
             "  if(!dir)return;" +
-            "  var cur=document.activeElement;" +
+            // document.activeElement is unreliable once the real focused node lives inside a
+            // shadow root (YouTube's whole card tree does): the DOM spec retargets it to the
+            // outermost shadow HOST, not the actual focused <a> - so after nxt.focus() below,
+            // re-reading document.activeElement next press returns the wrong element (the card
+            // container, not the link), poisoning nearest()'s distance math and making the
+            // CENTER/ENTER click-trigger (further down, reading this same global) click an inert
+            // container instead of the link that actually opens the video. Track it ourselves.
+            "  var cur=window._btvCur||document.activeElement;" +
             "  if(!cur||cur===document.body){" +
-            "    var els=getEls();if(els.length)els[0].focus();" +
+            "    var els=getEls();if(els.length){els[0].focus();window._btvCur=els[0];}" +
             "    return;" +
             "  }" +
             "  var nxt=nearest(cur,dir);" +
-            "  if(nxt)nxt.focus();" +
+            "  if(nxt){nxt.focus();window._btvCur=nxt;nxt.scrollIntoView({block:'nearest'});}" +
             "  else if(dir==='down')window.scrollBy(0,200);" +
-            "  else if(dir==='up')window.scrollBy(0,-200);" +
+            // Nothing above the current item (top of a video grid, etc.) — hand off to the
+            // native navbar instead of just eating the key. See onEdgeReached below.
+            "  else if(dir==='up'){if(typeof BraveTV!=='undefined')BraveTV.onEdgeReached('up');" +
+            "    else window.scrollBy(0,-200);}" +
             "});" +  // no 'true' capture — let page handle first
 
             "})()", null);
@@ -1096,6 +1188,19 @@ public class MainActivity extends Activity {
             }
             return true;
         });
+
+        // D-pad focus alone (just passing through on the way to another button) used to be
+        // enough to pop the keyboard open on urlBar, since EditText shows the IME on any focus
+        // by default. Block that and only show it for an actual activation — a touch tap, or
+        // pressing OK/Enter while urlBar is the focused view (View.performClick() fires the
+        // same click listener either way, which is the right TV-remote equivalent of a tap).
+        urlBar.setShowSoftInputOnFocus(false);
+        urlBar.setOnClickListener(v -> {
+            urlBar.requestFocus();
+            android.view.inputmethod.InputMethodManager imm =
+                (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) imm.showSoftInput(urlBar, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+        });
     }
 
     private void showSearchDialog() {
@@ -1150,6 +1255,24 @@ public class MainActivity extends Activity {
     private void loadUrl(String url) {
         webView.loadUrl(url);
         urlBar.setText(url);
+        // Without this, Android focus stays on whatever triggered the navigation (the 🔍 dialog,
+        // the urlBar's IME action, a region picker) after it closes, so D-pad presses never reach
+        // the page at all afterwards — same requestFocus pattern launchMode() already uses.
+        handler.postDelayed(() -> webView.requestFocus(), 350);
+    }
+
+    // Arriving at YouTube with a Referer that looks like organic search traffic (as if you'd
+    // searched for it from Brave Search) instead of a bare direct hit — the thing more likely to
+    // read as "an app, not a browser" and trigger the "download the app" interstitial. Doesn't
+    // guarantee YouTube won't still show it (that's their own server-side detection, not
+    // something a Referer header can fully defeat), but it's the one real lever available here,
+    // so worth doing. Only matters on the first request — SPA navigation after that doesn't
+    // re-send Referer anyway.
+    private void loadUrlFromBraveSearch(String url) {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Referer", "https://search.brave.com/search?q=youtube");
+        webView.loadUrl(url, headers);
+        urlBar.setText(url);
     }
 
     @Override
@@ -1174,20 +1297,37 @@ public class MainActivity extends Activity {
             return true;
         }
 
-        // WebView has its own default arrow-key handling (native page scroll) and consumes
-        // DPAD_UP via the view hierarchy before Activity.onKeyDown's fallback ever runs —
-        // confirmed on-device: a Log.d placed in onKeyDown's UP branch never once fired for a
-        // real key press, only for keys (LEFT/RIGHT/CENTER/BACK/SEARCH) WebView doesn't claim
-        // natively. Has to be caught one level higher, here, before super hands it to the view
-        // tree, or the native navbar (lupa/back/forward/cursor/▲) is never reachable by remote.
-        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getKeyCode() == KeyEvent.KEYCODE_DPAD_UP
+        // DPAD_UP/DOWN specifically: WebView's own default key handling (native page scroll)
+        // consumes both via the view hierarchy before Activity.onKeyDown's fallback ever runs —
+        // confirmed on-device for UP with a Log.d that never fired on a real key press.
+        // LEFT/RIGHT/CENTER don't suffer this (WebView has no native behavior for those absent a
+        // text input) and are forwarded from onKeyDown below as before.
+        //
+        // Forwarded into the page the same way as LEFT/RIGHT, instead of a native scrollBy, so
+        // the page's own item-by-item nearest() (injectDpadNavigation) selects the next/previous
+        // video rather than scrolling by a fixed pixel amount — "uno a uno", not a blind jump.
+        // DOWN still falls back to scrollBy when nearest() finds nothing (reaching the bottom of
+        // a loaded grid / a plain long page). UP's "nothing above" case calls back into
+        // escapeToNavbarFocus() via BraveTV.onEdgeReached('up') instead — see that method.
+        int keyCode = event.getKeyCode();
+        if (event.getAction() == KeyEvent.ACTION_DOWN
+                && (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN)
                 && !pointerMode && webView.getVisibility() == View.VISIBLE && webView.hasFocus()) {
-            // navBarHidden is already false here — the reveal check above caught that case.
-            View first = findViewById(R.id.btnSearch);
-            if (first != null) first.requestFocus();
+            dispatchSyntheticKey(keyCode == KeyEvent.KEYCODE_DPAD_UP ? 38 : 40);
             return true;
         }
+
         return super.dispatchKeyEvent(event);
+    }
+
+    // keyCode on a KeyboardEventInit is spec-inert in Chromium (read-only, meant to come from the
+    // real native event) — defineProperty is the only way to actually set it post-construct.
+    private void dispatchSyntheticKey(int jsKey) {
+        webView.evaluateJavascript(
+            "(function(){var e=new KeyboardEvent('keydown',{bubbles:true,cancelable:true});" +
+            "Object.defineProperty(e,'keyCode',{get:function(){return " + jsKey + ";}});" +
+            "Object.defineProperty(e,'which',{get:function(){return " + jsKey + ";}});" +
+            "document.dispatchEvent(e);})()", null);
     }
 
     @Override
@@ -1202,7 +1342,12 @@ public class MainActivity extends Activity {
                 setNavBarHidden(false);
                 return true;
             }
-            if (webView.canGoBack()) {
+            // On YouTube (TV or web) the SPA pushes a history entry on nearly every internal
+            // navigation, so webView.canGoBack() stays true almost forever — BACK would need
+            // dozens of presses to ever reach the menu. There, BACK always means "exit to menu";
+            // real page-history stepping only makes sense for actual browsing (Brave/incógnito).
+            boolean isYoutube = currentMode == NAV_YT_TV || currentMode == NAV_YT_WEB;
+            if (!isYoutube && webView.canGoBack()) {
                 webView.goBack();
             } else {
                 showHome();
@@ -1232,33 +1377,25 @@ public class MainActivity extends Activity {
         // Only intercept D-pad when WebView has focus AND navbar is hidden.
         // If navbar is visible, let super handle it so Android moves focus between buttons.
         if (!pointerMode && webView.getVisibility() == View.VISIBLE && webView.hasFocus()) {
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                webView.evaluateJavascript("window.scrollBy(0,220)", null);
-                return true;
-            }
-            // DPAD_UP is handled in dispatchKeyEvent() — WebView consumes it there before this
-            // method ever runs (see that override for why).
-            // LEFT/RIGHT/CENTER: Activity's default View.FocusFinder only walks native Android
-            // views, so once the navbar is hidden there's nothing else for it to land on and
-            // the key just dies here — confirmed on-device (stuck past the first focused page
-            // element, Buscar/Duck.ai/☰ all unreachable). The page's own injectDpadNavigation()
-            // listener is what actually walks focus between page elements, so these three still
-            // need to be forwarded into it as a synthetic DOM event, same as before. keyCode on
-            // a KeyboardEventInit is spec-inert in Chromium (read-only, meant to come from the
-            // real native event) — defineProperty is the only way to actually set it post-construct.
+            // DPAD_UP/DOWN are handled in dispatchKeyEvent() — WebView consumes those natively
+            // before this method ever runs (see that override for why).
+            // LEFT/RIGHT: Activity's default View.FocusFinder only walks native Android views,
+            // so once the navbar is hidden there's nothing else for it to land on and the key
+            // just dies here — confirmed on-device (stuck past the first focused page element,
+            // Buscar/Duck.ai/☰ all unreachable). The page's own injectDpadNavigation() listener
+            // is what actually walks focus between page elements, so these still need forwarding.
             int jsKey = keyCode == KeyEvent.KEYCODE_DPAD_LEFT ? 37
                 : keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? 39 : -1;
             if (jsKey != -1) {
-                webView.evaluateJavascript(
-                    "(function(){var e=new KeyboardEvent('keydown',{bubbles:true,cancelable:true});" +
-                    "Object.defineProperty(e,'keyCode',{get:function(){return " + jsKey + ";}});" +
-                    "Object.defineProperty(e,'which',{get:function(){return " + jsKey + ";}});" +
-                    "document.dispatchEvent(e);})()", null);
+                dispatchSyntheticKey(jsKey);
                 return true;
             }
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                 webView.evaluateJavascript(
-                    "(function(){var el=document.activeElement;" +
+                    // document.activeElement retargets to the outer shadow host once focus is
+                    // inside YouTube's card shadow trees, so it's not the actual link we focused
+                    // — window._btvCur (set by injectDpadNavigation's keydown handler) is.
+                    "(function(){var el=window._btvCur||document.activeElement;" +
                     "if(el&&el!==document.body){el.click();}else{" +
                     "var a=document.querySelectorAll('a[href],button');" +
                     "if(a.length)a[0].click();}})()", null);
