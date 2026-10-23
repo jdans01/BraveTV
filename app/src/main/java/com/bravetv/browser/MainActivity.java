@@ -899,14 +899,20 @@ public class MainActivity extends Activity {
             "  else if(e.keyCode===37)dir='left';" +
             "  else if(e.keyCode===39)dir='right';" +
             "  if(!dir)return;" +
-            "  var cur=document.activeElement;" +
+            // document.activeElement is unreliable once the real focused node lives inside a
+            // shadow root (YouTube's whole card tree does): the DOM spec retargets it to the
+            // outermost shadow HOST, not the actual focused <a> - so after nxt.focus() below,
+            // re-reading document.activeElement next press returns the wrong element (the card
+            // container, not the link), poisoning nearest()'s distance math and making the
+            // CENTER/ENTER click-trigger (further down, reading this same global) click an inert
+            // container instead of the link that actually opens the video. Track it ourselves.
+            "  var cur=window._btvCur||document.activeElement;" +
             "  if(!cur||cur===document.body){" +
-            "    var els=getEls();if(els.length)els[0].focus();" +
+            "    var els=getEls();if(els.length){els[0].focus();window._btvCur=els[0];}" +
             "    return;" +
             "  }" +
             "  var nxt=nearest(cur,dir);" +
-            "  console.log('BTVDIAG dir='+dir+' els='+getEls().length+' cur='+(cur.tagName+'#'+cur.id)+' nxt='+(nxt&&(nxt.tagName+'#'+nxt.id)));" +
-            "  if(nxt){nxt.focus();nxt.scrollIntoView({block:'nearest'});}" +
+            "  if(nxt){nxt.focus();window._btvCur=nxt;nxt.scrollIntoView({block:'nearest'});}" +
             "  else if(dir==='down')window.scrollBy(0,200);" +
             // Nothing above the current item (top of a video grid, etc.) — hand off to the
             // native navbar instead of just eating the key. See onEdgeReached below.
@@ -1392,7 +1398,10 @@ public class MainActivity extends Activity {
             }
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                 webView.evaluateJavascript(
-                    "(function(){var el=document.activeElement;" +
+                    // document.activeElement retargets to the outer shadow host once focus is
+                    // inside YouTube's card shadow trees, so it's not the actual link we focused
+                    // — window._btvCur (set by injectDpadNavigation's keydown handler) is.
+                    "(function(){var el=window._btvCur||document.activeElement;" +
                     "if(el&&el!==document.body){el.click();}else{" +
                     "var a=document.querySelectorAll('a[href],button');" +
                     "if(a.length)a[0].click();}})()", null);
