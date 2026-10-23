@@ -4,176 +4,184 @@
     android:layout_height="match_parent"
     android:background="#0C0C14">
 
-    <!-- NAV BAR — altura 56dp, se oculta en fullscreen -->
+    <!-- NAV BAR -->
     <LinearLayout
         android:id="@+id/navBar"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="52dp"
         android:background="#0D0D1C"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
         android:elevation="10dp"
         android:visibility="gone">
 
-        <Button
-            android:id="@+id/btnYoutube"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:text="&#9654; Inicio"
-            android:textColor="#F1F0FF"
-            android:textSize="13sp"
-            android:background="@drawable/btn_primary"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:focusable="true"
-            android:nextFocusRight="@id/btnSearch" />
-
+        <!-- Búsqueda / lupa -->
         <Button
             android:id="@+id/btnSearch"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:text="&#128269;"
             android:textColor="#F1F0FF"
             android:textSize="15sp"
             android:background="@drawable/btn_nav"
-            android:layout_marginStart="6dp"
+            android:padding="0dp"
             android:focusable="true"
-            android:nextFocusLeft="@id/btnYoutube"
             android:nextFocusRight="@id/urlBar" />
 
+        <!-- Barra URL — ocupa todo el espacio disponible -->
         <EditText
             android:id="@+id/urlBar"
             android:layout_width="0dp"
-            android:layout_height="36dp"
+            android:layout_height="34dp"
             android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
+            android:layout_marginStart="5dp"
+            android:layout_marginEnd="5dp"
             android:background="@drawable/url_bar_bg"
             android:textColor="#F1F0FF"
             android:textColorHint="#4A4A6A"
-            android:hint="Escribe una URL..."
+            android:hint="Buscar o escribir URL..."
             android:textSize="12sp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
             android:singleLine="true"
             android:imeOptions="actionGo"
-            android:inputType="textUri"
+            android:inputType="text"
             android:focusable="true"
             android:nextFocusLeft="@id/btnSearch"
             android:nextFocusRight="@id/btnBlockCount" />
 
+        <!-- Contador bloqueos -->
         <TextView
             android:id="@+id/btnBlockCount"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
+            android:layout_height="32dp"
             android:text="&#128683; 0"
             android:textColor="#4ADE80"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:textStyle="bold"
             android:background="@drawable/btn_vpn"
             android:gravity="center"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
+            android:paddingStart="7dp"
+            android:paddingEnd="7dp"
+            android:layout_marginEnd="3dp"
             android:focusable="false" />
 
+        <!-- VPN -->
         <Button
             android:id="@+id/btnVpn"
             android:layout_width="wrap_content"
-            android:layout_height="40dp"
+            android:layout_height="36dp"
             android:text="&#127758; US"
             android:textColor="#F1F0FF"
-            android:textSize="11sp"
+            android:textSize="10sp"
             android:background="@drawable/btn_vpn"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:layout_marginStart="6dp"
+            android:paddingStart="7dp"
+            android:paddingEnd="7dp"
             android:focusable="true"
             android:nextFocusLeft="@id/urlBar"
-            android:nextFocusRight="@id/btnCursor" />
-
-        <!-- Pointer/cursor toggle: arrow icon -->
-        <ImageButton
-            android:id="@+id/btnCursor"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/cursor_arrow"
-            android:scaleX="0.85"
-            android:scaleY="0.85"
-            android:alpha="0.5"
-            android:background="@drawable/btn_cursor"
-            android:layout_marginStart="5dp"
-            android:focusable="true"
-            android:nextFocusLeft="@id/btnVpn"
-            android:nextFocusRight="@id/btnHideNav"
-            android:contentDescription="Modo puntero" />
-
-        <!-- Hide navbar button -->
-        <Button
-            android:id="@+id/btnHideNav"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:text="&#9650;"
-            android:textColor="#6B6B8A"
-            android:textSize="13sp"
-            android:background="@drawable/btn_nav"
-            android:layout_marginStart="4dp"
-            android:focusable="true"
-            android:nextFocusLeft="@id/btnCursor"
             android:nextFocusRight="@id/btnBack" />
 
+        <!-- Atrás -->
         <Button
             android:id="@+id/btnBack"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:text="&#9664;"
             android:textColor="#F1F0FF"
-            android:textSize="15sp"
+            android:textSize="13sp"
             android:background="@drawable/btn_nav"
-            android:layout_marginStart="5dp"
+            android:padding="0dp"
+            android:layout_marginStart="3dp"
             android:focusable="true"
-            android:nextFocusLeft="@id/btnHideNav"
+            android:nextFocusLeft="@id/btnVpn"
             android:nextFocusRight="@id/btnForward" />
 
+        <!-- Adelante -->
         <Button
             android:id="@+id/btnForward"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:text="&#9654;"
             android:textColor="#F1F0FF"
-            android:textSize="15sp"
+            android:textSize="13sp"
             android:background="@drawable/btn_nav"
-            android:layout_marginStart="4dp"
+            android:padding="0dp"
+            android:layout_marginStart="2dp"
             android:focusable="true"
             android:nextFocusLeft="@id/btnBack"
             android:nextFocusRight="@id/btnRefresh" />
 
+        <!-- Recargar -->
         <Button
             android:id="@+id/btnRefresh"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:text="&#8635;"
             android:textColor="#F1F0FF"
-            android:textSize="19sp"
+            android:textSize="15sp"
             android:background="@drawable/btn_nav"
-            android:layout_marginStart="4dp"
+            android:padding="0dp"
+            android:layout_marginStart="2dp"
             android:focusable="true"
             android:nextFocusLeft="@id/btnForward"
             android:nextFocusRight="@id/btnHome" />
 
+        <!-- Inicio -->
         <Button
             android:id="@+id/btnHome"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:text="&#8962;"
             android:textColor="#F1F0FF"
-            android:textSize="19sp"
+            android:textSize="15sp"
             android:background="@drawable/btn_nav"
-            android:layout_marginStart="4dp"
+            android:padding="0dp"
+            android:layout_marginStart="2dp"
             android:focusable="true"
             android:nextFocusLeft="@id/btnRefresh"
+            android:nextFocusRight="@id/btnCursor" />
+
+        <!-- Puntero (flecha) -->
+        <ImageButton
+            android:id="@+id/btnCursor"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:src="@drawable/cursor_arrow"
+            android:scaleX="0.7"
+            android:scaleY="0.7"
+            android:alpha="0.45"
+            android:background="@drawable/btn_cursor"
+            android:padding="0dp"
+            android:layout_marginStart="2dp"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnHome"
+            android:nextFocusRight="@id/btnHideNav"
+            android:contentDescription="Modo puntero" />
+
+        <!-- Ocultar barra -->
+        <Button
+            android:id="@+id/btnHideNav"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:text="&#9650;"
+            android:textColor="#5A5A7A"
+            android:textSize="10sp"
+            android:background="@drawable/btn_nav"
+            android:padding="0dp"
+            android:layout_marginStart="2dp"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnCursor"
             android:nextFocusDown="@id/webView" />
+
+        <!-- btnYoutube oculto para compatibilidad con código Java existente -->
+        <Button
+            android:id="@+id/btnYoutube"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone"
+            android:focusable="false" />
 
     </LinearLayout>
 

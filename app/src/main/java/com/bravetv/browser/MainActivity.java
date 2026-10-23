@@ -927,9 +927,17 @@ public class MainActivity extends Activity {
         });
 
         urlBar.setOnEditorActionListener((v, actionId, event) -> {
-            String url = urlBar.getText().toString().trim();
-            if (!url.startsWith("http")) url = "https://" + url;
-            loadUrl(url);
+            String input = urlBar.getText().toString().trim();
+            if (input.isEmpty()) return true;
+            // If it looks like a URL, navigate; otherwise search in the current mode
+            boolean isUrl = input.startsWith("http://") || input.startsWith("https://")
+                || (input.contains(".") && !input.contains(" ") && input.length() > 4);
+            if (isUrl) {
+                String url = input.startsWith("http") ? input : "https://" + input;
+                loadUrl(url);
+            } else {
+                doSearch(input);
+            }
             return true;
         });
     }
