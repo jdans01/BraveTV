@@ -605,6 +605,86 @@ public class MainActivity extends Activity {
             "},250);})()", null);
     }
 
+    // ─── D-pad spatial navigation injection ──────────────────────────────────
+    private void injectDpadNavigation(WebView view) {
+        // Skip on YouTube TV — it has its own perfect D-pad engine
+        String url = view.getUrl();
+        if (url != null && url.contains("youtube.com/tv")) return;
+
+        view.evaluateJavascript(
+            "(function(){" +
+            "if(window._btvNav) return; window._btvNav=true;" +
+
+            // ── Style: highlight focused element ──────────────────────────
+            "var _st=document.createElement('style');_st.id='_btv_nav_css';" +
+            "_st.innerHTML=" +
+            "':focus{outline:3px solid #C084FC!important;outline-offset:2px!important;" +
+            "border-radius:4px!important;box-shadow:0 0 0 6px rgba(192,132,252,0.25)!important;}'" +
+            ";document.head.appendChild(_st);" +
+
+            // ── Focusable selector ────────────────────────────────────────
+            "var SEL='a[href],button:not([disabled]),input:not([disabled])," +
+            "select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex=\"-1\"])," +
+            "[role=\"button\"],[role=\"link\"],[role=\"menuitem\"],[role=\"option\"]';" +
+
+            "function getEls(){" +
+            "  return Array.from(document.querySelectorAll(SEL)).filter(function(e){" +
+            "    var r=e.getBoundingClientRect();" +
+            "    return r.width>0&&r.height>0&&r.top<window.innerHeight&&r.bottom>0;" +
+            "  });" +
+            "}" +
+
+            // ── Spatial: find nearest element in a direction ──────────────
+            "function nearest(cur,dir){" +
+            "  var els=getEls();" +
+            "  if(!els.length)return null;" +
+            "  var cr=cur.getBoundingClientRect();" +
+            "  var cx=cr.left+cr.width/2, cy=cr.top+cr.height/2;" +
+            "  var best=null,bestScore=Infinity;" +
+            "  for(var i=0;i<els.length;i++){" +
+            "    var el=els[i]; if(el===cur)continue;" +
+            "    var r=el.getBoundingClientRect();" +
+            "    var ex=r.left+r.width/2, ey=r.top+r.height/2;" +
+            "    var dx=ex-cx, dy=ey-cy;" +
+            "    var ok=false;" +
+            "    if(dir==='up'   &&dy<-8)ok=true;" +
+            "    if(dir==='down' &&dy>8) ok=true;" +
+            "    if(dir==='left' &&dx<-8)ok=true;" +
+            "    if(dir==='right'&&dx>8) ok=true;" +
+            "    if(!ok)continue;" +
+            "    // Weight: prefer aligned axis heavily" +
+            "    var primary=dir==='up'||dir==='down'?Math.abs(dy):Math.abs(dx);" +
+            "    var cross  =dir==='up'||dir==='down'?Math.abs(dx):Math.abs(dy);" +
+            "    var score=primary+cross*2;" +
+            "    if(score<bestScore){bestScore=score;best=el;}" +
+            "  }" +
+            "  return best;" +
+            "}" +
+
+            // ── Key listener ──────────────────────────────────────────────
+            "document.addEventListener('keydown',function(e){" +
+            "  var dir=null;" +
+            "  if(e.keyCode===38)dir='up';" +
+            "  else if(e.keyCode===40)dir='down';" +
+            "  else if(e.keyCode===37)dir='left';" +
+            "  else if(e.keyCode===39)dir='right';" +
+            "  if(!dir)return;" +
+            "  var cur=document.activeElement;" +
+            "  if(!cur||cur===document.body){" +
+            // Nothing focused yet: pick the most visible element near center
+            "    var els=getEls();" +
+            "    if(els.length){els[0].focus();e.preventDefault();}" +
+            "    return;" +
+            "  }" +
+            "  var nxt=nearest(cur,dir);" +
+            "  if(nxt){nxt.focus();e.preventDefault();}" +
+            "  else if(dir==='down'){window.scrollBy(0,200);e.preventDefault();}" +
+            "  else if(dir==='up'){window.scrollBy(0,-200);e.preventDefault();}" +
+            "},true);" +
+
+            "})()", null);
+    }
+
     // ─── WebView setup ────────────────────────────────────────────────────────
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     private void setupWebView() {
@@ -678,6 +758,7 @@ public class MainActivity extends Activity {
                 });
 
                 injectAdBlocker(view);
+                injectDpadNavigation(view);
 
                 // Force highest available video quality (1080p → 4K)
                 view.evaluateJavascript(
@@ -762,7 +843,7 @@ public class MainActivity extends Activity {
                 String url = req.getUrl().toString();
                 view.loadUrl(currentMode != NAV_INCOGNITO ? applyRegion(url) : url);
                 // Re-inject ad blocker after SPA navigation (YouTube TV doesn't fire onPageFinished)
-                handler.postDelayed(() -> injectAdBlocker(view), 1200);
+                handler.postDelayed(() -> { injectAdBlocker(view); injectDpadNavigation(view); }, 1200);
                 return true;
             }
         });
@@ -946,14 +1027,30 @@ public class MainActivity extends Activity {
                     simulateClick(cursor.x, cursor.y); return true;
             }
         }
-        // D-pad scroll in WebView (normal mode)
-        if (!pointerMode && webView.getVisibility() == View.VISIBLE && webView.hasFocus()) {
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                webView.evaluateJavascript("window.scrollBy(0,200)", null);
+        // Normal mode: forward D-pad as arrow key events so injected JS spatial nav handles them
+        if (!pointerMode && webView.getVisibility() == View.VISIBLE) {
+            int jsKey = -1;
+            switch (keyCode) {
+                case KeyEvent.KEYCODE_DPAD_UP:    jsKey = 38; break;
+                case KeyEvent.KEYCODE_DPAD_DOWN:  jsKey = 40; break;
+                case KeyEvent.KEYCODE_DPAD_LEFT:  jsKey = 37; break;
+                case KeyEvent.KEYCODE_DPAD_RIGHT: jsKey = 39; break;
+            }
+            if (jsKey != -1) {
+                final int k = jsKey;
+                webView.evaluateJavascript(
+                    "(function(){var e=new KeyboardEvent('keydown'," +
+                    "{bubbles:true,cancelable:true,keyCode:" + k + ",which:" + k + "});" +
+                    "document.dispatchEvent(e);})()", null);
                 return true;
             }
-            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                webView.evaluateJavascript("window.scrollBy(0,-200)", null);
+            // OK/Enter → click focused element
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                webView.evaluateJavascript(
+                    "(function(){var el=document.activeElement;" +
+                    "if(el&&el!==document.body){el.click();}else{" +
+                    "var a=document.querySelectorAll('a[href],button');" +
+                    "if(a.length)a[0].click();}})()", null);
                 return true;
             }
         }
