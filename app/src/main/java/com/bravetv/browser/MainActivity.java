@@ -791,7 +791,16 @@ public class MainActivity extends Activity {
         if (url != null && url.contains("youtube.com/tv")) return;
         view.evaluateJavascript(
             "(function(){" +
-            "if(window._btvNav) return; window._btvNav=true;" +
+            "if(window._btvNav) return;" +
+            // This can run before <head> exists yet (called right after shouldOverrideUrlLoading
+            // fires, ahead of the new document settling) — appendChild below would then throw on
+            // a null document.head. That happened AFTER the window._btvNav=true guard used to be
+            // set, which poisoned it: every later re-injection attempt (onPageFinished, the
+            // 1200ms delayed retry) saw the flag already true and skipped entirely, so the
+            // keydown listener never got attached at all for the rest of that page's life.
+            // Bail out without setting the flag so the next retry can actually succeed.
+            "if(!document.head) return;" +
+            "window._btvNav=true;" +
 
             // Highlight focused element
             "var _st=document.createElement('style');_st.id='_btv_nav_css';" +
