@@ -1101,12 +1101,6 @@ public class MainActivity extends Activity {
             public void onProgressChanged(WebView view, int p) { progressBar.setProgress(p); }
 
             @Override
-            public boolean onConsoleMessage(android.webkit.ConsoleMessage cm) {
-                android.util.Log.d("BTVDIAG", cm.message());
-                return true;
-            }
-
-            @Override
             public void onShowCustomView(View view, CustomViewCallback cb) {
                 navBar.setVisibility(View.GONE);
                 webView.setVisibility(View.GONE);
