@@ -1189,6 +1189,10 @@ public class MainActivity extends Activity {
     private void loadUrl(String url) {
         webView.loadUrl(url);
         urlBar.setText(url);
+        // Without this, Android focus stays on whatever triggered the navigation (the 🔍 dialog,
+        // the urlBar's IME action, a region picker) after it closes, so D-pad presses never reach
+        // the page at all afterwards — same requestFocus pattern launchMode() already uses.
+        handler.postDelayed(() -> webView.requestFocus(), 350);
     }
 
     // Arriving at YouTube with a Referer that looks like organic search traffic (as if you'd
