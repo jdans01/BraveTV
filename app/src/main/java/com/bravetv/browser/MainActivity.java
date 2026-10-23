@@ -823,7 +823,14 @@ public class MainActivity extends Activity {
             "  walk(document);" +
             "  return out.filter(function(e){" +
             "    var r=e.getBoundingClientRect();" +
-            "    return r.width>0&&r.height>0&&r.top<window.innerHeight&&r.bottom>0;" +
+            // YouTube's persistent left rail (Principal/Shorts/Suscripciones/Tú) sits only ~150px
+            // wide but is much closer in raw pixel distance to anything near the top of the page
+            // than the actual content below/right of it is — nearest()'s distance scoring kept
+            // picking the rail over the video grid, so DOWN from the filter chips just ping-ponged
+            // between a chip and the rail and could never reach a single video. Excluding it is
+            // a fair trade since BraveTV's own navbar already has its own way back to the home
+            // screen, and this rail needs a signed-in account for most of its items anyway.
+            "    return r.width>0&&r.height>0&&r.top<window.innerHeight&&r.bottom>0&&r.left>160;" +
             "  });" +
             "}" +
 
