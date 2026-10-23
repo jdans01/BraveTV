@@ -797,8 +797,24 @@ public class MainActivity extends Activity {
             "select:not([disabled]),[tabindex]:not([tabindex=\"-1\"])," +
             "[role=\"button\"],[role=\"link\"],[role=\"menuitem\"]';" +
 
+            // Plain querySelectorAll never sees inside a shadow root. YouTube's video cards are
+            // Polymer custom elements (ytd-video-renderer etc.) with open shadow roots, so the
+            // old light-DOM-only query found zero of them there — nearest() always returned null
+            // on YouTube specifically, even though the same code worked fine on plain-DOM sites
+            // like DuckDuckGo. Walk every element's shadowRoot too (open roots only; a closed one
+            // is unreachable from here by design, YouTube doesn't use those).
             "function getEls(){" +
-            "  return Array.from(document.querySelectorAll(SEL)).filter(function(e){" +
+            "  var out=[];" +
+            "  function walk(root){" +
+            "    var all=root.querySelectorAll('*');" +
+            "    for(var i=0;i<all.length;i++){" +
+            "      var e=all[i];" +
+            "      if(e.matches&&e.matches(SEL))out.push(e);" +
+            "      if(e.shadowRoot)walk(e.shadowRoot);" +
+            "    }" +
+            "  }" +
+            "  walk(document);" +
+            "  return out.filter(function(e){" +
             "    var r=e.getBoundingClientRect();" +
             "    return r.width>0&&r.height>0&&r.top<window.innerHeight&&r.bottom>0;" +
             "  });" +
