@@ -177,6 +177,26 @@
         android:padding="4dp"
         android:visibility="gone" />
 
+    <!-- Botón flotante para recuperar la barra cuando está oculta -->
+    <TextView
+        android:id="@+id/btnRevealNav"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="0dp"
+        android:text="▼ Menú"
+        android:textColor="#CCFFFFFF"
+        android:textSize="11sp"
+        android:background="@drawable/pill_reveal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:gravity="center"
+        android:focusable="true"
+        android:clickable="true"
+        android:visibility="gone"
+        android:elevation="12dp" />
+
     <LinearLayout
         android:id="@+id/fullscreenContainer"
         android:layout_width="match_parent"

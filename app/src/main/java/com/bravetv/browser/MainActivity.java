@@ -45,6 +45,7 @@ public class MainActivity extends Activity {
     private int blockedCount = 0;
     private TextView btnBlockCount;
     private TextView homeBlockCount;
+    private View btnRevealNav;
 
     // ─── Regiones ─────────────────────────────────────────────────────────────
     private static final String[] AUTO_REGIONS = {
@@ -73,12 +74,18 @@ public class MainActivity extends Activity {
         "cm.g.doubleclick.net","ad.doubleclick.net","securepubads.g.doubleclick.net",
         "pubads.g.doubleclick.net","connect.facebook.net","graph.facebook.com",
         "outbrain.com","taboola.com","moatads.com","amazon-adsystem.com",
-        "adsafeprotected.com","2mdn.net","adnxs.com"
+        "adsafeprotected.com","2mdn.net","adnxs.com",
+        // Additional ad/tracking domains
+        "yt3.ggpht.com","sb.scorecardresearch.com","pixel.quantserve.com",
+        "s.ytimg.com/yts/imgbin","static.doubleclick.net",
+        "survey.g.doubleclick.net","www.youtube-nocookie.com"
     ));
     private static final Set<String> AD_URL_PATTERNS = new HashSet<>(Arrays.asList(
         "/pagead/","/ads/","/adview","ad_type=","doubleclick","/ptracking",
         "/get_video_info?","googlevideo.com/videoplayback?ctier=L",
-        "youtube.com/api/stats/ads","youtube.com/pagead","youtube.com/ptracking"
+        "youtube.com/api/stats/ads","youtube.com/pagead","youtube.com/ptracking",
+        "/api/stats/qoe?","/api/stats/atr?","/youtubei/v1/log_event",
+        "ad_video_id=","&ad_cpn=","ctier=L&","&oad=1","&adformat="
     ));
 
     private boolean isAdUrl(String url) {
@@ -185,9 +192,13 @@ public class MainActivity extends Activity {
                 .translationY(-navBar.getHeight() - dp(4))
                 .alpha(0f)
                 .setDuration(350)
-                .withEndAction(() -> navBar.setVisibility(View.INVISIBLE))
+                .withEndAction(() -> {
+                    navBar.setVisibility(View.INVISIBLE);
+                    if (btnRevealNav != null) btnRevealNav.setVisibility(View.VISIBLE);
+                })
                 .start();
         } else {
+            if (btnRevealNav != null) btnRevealNav.setVisibility(View.GONE);
             navBar.setVisibility(View.VISIBLE);
             navBar.animate()
                 .translationY(0)
@@ -342,6 +353,8 @@ public class MainActivity extends Activity {
         recentsList    = findViewById(R.id.recentsList);
         btnBlockCount  = findViewById(R.id.btnBlockCount);
         homeBlockCount = findViewById(R.id.homeBlockCount);
+        btnRevealNav   = findViewById(R.id.btnRevealNav);
+        btnRevealNav.setOnClickListener(v -> setNavBarHidden(false));
 
         prefs = getSharedPreferences("bravetv", 0); // Context.MODE_PRIVATE = 0
         autoVpnEnabled = prefs.getBoolean("vpn", true);
@@ -480,6 +493,49 @@ public class MainActivity extends Activity {
         CookieManager.getInstance().flush();
     }
 
+    // ─── Ad blocker injection (called on page load AND on SPA navigation) ────
+    private void injectAdBlocker(WebView view) {
+        // CSS: hide all ad containers
+        view.evaluateJavascript(
+            "(function(){" +
+            "if(document.getElementById('_btv_css')) return;" +
+            "var s=document.createElement('style');s.id='_btv_css';" +
+            "s.innerHTML=" +
+            "'ytd-display-ad-renderer,ytd-promoted-sparkles-web-renderer," +
+            "ytd-promoted-video-renderer,ytd-search-pyv-renderer," +
+            "ytd-banner-promo-renderer,ytd-statement-banner-renderer," +
+            ".ytp-ad-module,.ytp-ad-overlay-container,.ytp-ad-text-overlay," +
+            ".ytp-ad-skip-button-container+div,.video-ads,#player-ads," +
+            "ytm-promoted-sparkles-web-renderer,.ytd-mealbar-promo-renderer," +
+            "tp-yt-paper-dialog.ytd-popup-container," +
+            // YouTube TV ad overlays
+            "ytlr-ad-placement-renderer,.ytlr-ad-action-interstitial-renderer," +
+            ".ytlr-companion-slot,ytlr-mealbar-promo-renderer" +
+            "{display:none!important;visibility:hidden!important;}';" +
+            "document.head.appendChild(s);})()", null);
+
+        // JS: skip button + fast-forward video ads + mute while ad plays
+        view.evaluateJavascript(
+            "(function(){" +
+            "if(window._btvSkip) return; window._btvSkip=true;" +
+            "setInterval(function(){" +
+            // Click any skip button
+            "  var sk=document.querySelector(" +
+            "    '.ytp-ad-skip-button,.ytp-skip-ad-button," +
+            "     .ytp-ad-skip-button-modern,ytlr-skip-ad-renderer button');" +
+            "  if(sk){sk.click();return;}" +
+            // If ad is showing, jump video to end
+            "  if(document.querySelector('.ad-showing,.ad-interrupting')){" +
+            "    var v=document.querySelector('video');" +
+            "    if(v&&v.duration>0&&!isNaN(v.duration)){" +
+            "      v.currentTime=v.duration;v.muted=false;}" +
+            "  }" +
+            // YouTube TV: dismiss interstitial ads
+            "  var btn=document.querySelector('[data-dismiss-interstitial]');" +
+            "  if(btn) btn.click();" +
+            "},250);})()", null);
+    }
+
     // ─── WebView setup ────────────────────────────────────────────────────────
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     private void setupWebView() {
@@ -552,22 +608,7 @@ public class MainActivity extends Activity {
                     }
                 });
 
-                // Hide ad elements
-                view.evaluateJavascript(
-                    "(function(){var s=document.createElement('style');" +
-                    "s.innerHTML='ytd-display-ad-renderer,ytd-promoted-sparkles-web-renderer," +
-                    "ytd-promoted-video-renderer,ytd-search-pyv-renderer,.ytp-ad-module," +
-                    ".ytp-ad-overlay-container,.ytp-ad-text-overlay,.video-ads," +
-                    "#player-ads,ytm-promoted-sparkles-web-renderer{display:none!important}';" +
-                    "document.head.appendChild(s);})()", null);
-
-                // Auto-skip ads
-                view.evaluateJavascript(
-                    "setInterval(function(){" +
-                    "var sk=document.querySelector('.ytp-ad-skip-button,.ytp-skip-ad-button');" +
-                    "if(sk)sk.click();" +
-                    "if(document.querySelector('.ad-showing')){" +
-                    "var v=document.querySelector('video');if(v)v.currentTime=v.duration;}},300);", null);
+                injectAdBlocker(view);
 
                 // Force highest available video quality (1080p → 4K)
                 view.evaluateJavascript(
@@ -651,6 +692,8 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
                 String url = req.getUrl().toString();
                 view.loadUrl(currentMode != NAV_INCOGNITO ? applyRegion(url) : url);
+                // Re-inject ad blocker after SPA navigation (YouTube TV doesn't fire onPageFinished)
+                handler.postDelayed(() -> injectAdBlocker(view), 1200);
                 return true;
             }
         });
@@ -742,20 +785,28 @@ public class MainActivity extends Activity {
     }
 
     private void showSearchDialog() {
+        String hint;
+        String title;
+        switch (currentMode) {
+            case NAV_BRAVE:     hint = "Buscar en Brave Search...";   title = "🔍 Brave Search";   break;
+            case NAV_INCOGNITO: hint = "Buscar en DuckDuckGo...";     title = "🔒 DuckDuckGo";     break;
+            default:            hint = "Buscar en YouTube...";        title = "🔍 Buscar YouTube";  break;
+        }
+
         final EditText input = new EditText(this);
-        input.setHint("Buscar en YouTube...");
+        input.setHint(hint);
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         input.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
 
         android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(this)
-            .setTitle("🔍 Buscar en YouTube")
+            .setTitle(title)
             .setView(input)
-            .setPositiveButton("Buscar", (d, w) -> doYoutubeSearch(input.getText().toString()))
+            .setPositiveButton("Buscar", (d, w) -> doSearch(input.getText().toString()))
             .setNegativeButton("Cancelar", null)
             .create();
 
         input.setOnEditorActionListener((v, actionId, event) -> {
-            doYoutubeSearch(input.getText().toString());
+            doSearch(input.getText().toString());
             dialog.dismiss();
             return true;
         });
@@ -764,11 +815,22 @@ public class MainActivity extends Activity {
         input.requestFocus();
     }
 
-    private void doYoutubeSearch(String query) {
+    private void doSearch(String query) {
         query = query == null ? "" : query.trim();
         if (query.isEmpty()) return;
-        String url = "https://www.youtube.com/results?search_query=" + Uri.encode(query);
-        loadUrl(applyRegion(url));
+        String url;
+        switch (currentMode) {
+            case NAV_BRAVE:
+                url = "https://search.brave.com/search?q=" + Uri.encode(query);
+                break;
+            case NAV_INCOGNITO:
+                url = "https://duckduckgo.com/?q=" + Uri.encode(query);
+                break;
+            default:
+                url = applyRegion("https://www.youtube.com/results?search_query=" + Uri.encode(query));
+                break;
+        }
+        loadUrl(url);
     }
 
     private void loadUrl(String url) {
