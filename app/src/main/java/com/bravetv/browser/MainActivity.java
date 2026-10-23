@@ -780,11 +780,15 @@ public class MainActivity extends Activity {
 
     // ─── D-pad spatial navigation injection ──────────────────────────────────
     private void injectDpadNavigation(WebView view) {
-        // Skip on YouTube (all variants) — it has its own D-pad engine; our listener breaks it
+        // Only the real youtube.com/tv interface (ytlr-app) has its own working D-pad engine —
+        // injecting here would fight it. But the "download the app" interstitial on this TV
+        // reliably bounces /tv over to plain desktop youtube.com instead (confirmed on-device),
+        // and desktop YouTube's arrow-key handling is just a roving-tabindex widget on the
+        // Todo/Shorts/.../Filtros chip row at the top — arrows move sideways through the chips
+        // and never escape into the video grid below, so DOWN/selecting a video never worked
+        // there. Inject on every YouTube page except the actual /tv interface.
         String url = view.getUrl();
-        if (url != null && url.contains("youtube.com")) return;
-
-        // Only inject on non-YouTube pages (Brave Search, DuckDuckGo, generic web)
+        if (url != null && url.contains("youtube.com/tv")) return;
         view.evaluateJavascript(
             "(function(){" +
             "if(window._btvNav) return; window._btvNav=true;" +
