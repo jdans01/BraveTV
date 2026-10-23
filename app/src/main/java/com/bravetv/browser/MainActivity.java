@@ -279,9 +279,24 @@ public class MainActivity extends Activity {
     }
 
     // ─── Navbar auto-hide ─────────────────────────────────────────────────────
+    // Used to only hide for video fullscreen (BraveTV.onFullscreen()). Nothing hid it while just
+    // browsing a regular page, and once hidden there was no way back: btnRevealNav sat there
+    // "visible" but WebView always had Android focus and ate every D-pad press itself (scroll on
+    // UP/DOWN, forwarded into the page on LEFT/RIGHT/CENTER), so the native navbar buttons —
+    // lupa, back/forward, cursor toggle, btnRevealNav itself — were never reachable. Confirmed
+    // on-device: once past the first page element there was no way back to BraveTV's own chrome.
+    private static final long AUTO_HIDE_MS = 6000;
+    private final Runnable autoHideNav = () -> { if (!navBarHidden) setNavBarHidden(true); };
+
+    private void scheduleAutoHide() {
+        handler.removeCallbacks(autoHideNav);
+        if (homeScreen.getVisibility() != View.VISIBLE) handler.postDelayed(autoHideNav, AUTO_HIDE_MS);
+    }
+
     private void setNavBarHidden(boolean hide) {
         navBarHidden = hide;
         if (hide) {
+            handler.removeCallbacks(autoHideNav);
             navBar.animate()
                 .translationY(-navBar.getHeight() - dp(4))
                 .alpha(0f)
@@ -299,6 +314,7 @@ public class MainActivity extends Activity {
                 .alpha(1f)
                 .setDuration(280)
                 .start();
+            scheduleAutoHide();
         }
     }
 
@@ -891,8 +907,14 @@ public class MainActivity extends Activity {
                 injectDpadNavigation(view);
 
                 // Force highest available video quality (1080p → 4K)
+                // Unguarded before: onPageFinished can fire more than once for the same page
+                // (redirects, iframes), and every extra firing stacked another setInterval that
+                // ran forever — the likely cause of the app getting slower the longer it's used.
+                // injectAdBlocker's own loop and injectDpadNavigation already guard themselves
+                // (window._btvSkip2 / window._btvNav); this one and the two below didn't.
                 view.evaluateJavascript(
                     "(function(){" +
+                    "if(window._btvHD) return; window._btvHD=true;" +
                     "var QUALITIES=['hd2160','hd1440','hd1080','hd720'];" +
                     "function forceHD(){" +
                     // Standard YouTube web player
@@ -933,7 +955,9 @@ public class MainActivity extends Activity {
                 // Geo-block detector
                 if (currentMode != NAV_INCOGNITO) {
                     view.evaluateJavascript(
-                        "(function(){var kw=['country','región','region','not available'," +
+                        "(function(){" +
+                        "if(window._btvGeo) return; window._btvGeo=true;" +
+                        "var kw=['country','región','region','not available'," +
                         "'tu país','disponible','restricted','blocked'];" +
                         "var sel=['.ytp-error-content-wrap-subreason'," +
                         "'.ytp-error-content-wrap-reason','#error-screen yt-formatted-string'," +
@@ -950,7 +974,9 @@ public class MainActivity extends Activity {
 
                 // Fullscreen / auto-hide navbar — covers YouTube web + YouTube TV
                 view.evaluateJavascript(
-                    "(function(){var _fs=false;" +
+                    "(function(){" +
+                    "if(window._btvFS) return; window._btvFS=true;" +
+                    "var _fs=false;" +
                     "function isFS(){" +
                     "  if(!!document.fullscreenElement||!!document.webkitFullscreenElement) return true;" +
                     "  var v=document.querySelector('video');" +
@@ -1127,6 +1153,44 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        // Whatever ends up handling a key — WebView's own native scroll on DPAD_UP, a focused
+        // navbar Button's built-in nextFocusRight/Left walk between buttons, or our onKeyDown
+        // fallback below — all of those consume the event inside super.dispatchKeyEvent() before
+        // Activity.onKeyDown ever sees it, which is where scheduleAutoHide() used to live. Net
+        // effect, confirmed on-device: moving between navbar buttons never reset the auto-hide
+        // timer, so it could hide the bar out from under you mid-navigation. Only a catch here,
+        // ahead of everything, sees every key reliably.
+        if (event.getAction() == KeyEvent.ACTION_DOWN) scheduleAutoHide();
+
+        // Same bypass, same fix: reveal-on-any-key used to live in onKeyDown too, so e.g. DOWN
+        // never revealed the bar — it went straight into the page (WebView's native scroll, or
+        // page-internal focus shift) and onKeyDown never ran. Catch it here instead, for every
+        // key except BACK (that one gets its own first-press-reveals handling below, with
+        // slightly different semantics around the home screen).
+        if (event.getAction() == KeyEvent.ACTION_DOWN && navBarHidden
+                && event.getKeyCode() != KeyEvent.KEYCODE_BACK) {
+            setNavBarHidden(false);
+            return true;
+        }
+
+        // WebView has its own default arrow-key handling (native page scroll) and consumes
+        // DPAD_UP via the view hierarchy before Activity.onKeyDown's fallback ever runs —
+        // confirmed on-device: a Log.d placed in onKeyDown's UP branch never once fired for a
+        // real key press, only for keys (LEFT/RIGHT/CENTER/BACK/SEARCH) WebView doesn't claim
+        // natively. Has to be caught one level higher, here, before super hands it to the view
+        // tree, or the native navbar (lupa/back/forward/cursor/▲) is never reachable by remote.
+        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getKeyCode() == KeyEvent.KEYCODE_DPAD_UP
+                && !pointerMode && webView.getVisibility() == View.VISIBLE && webView.hasFocus()) {
+            // navBarHidden is already false here — the reveal check above caught that case.
+            View first = findViewById(R.id.btnSearch);
+            if (first != null) first.requestFocus();
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (homeScreen.getVisibility() == View.VISIBLE) {
@@ -1168,15 +1232,12 @@ public class MainActivity extends Activity {
         // Only intercept D-pad when WebView has focus AND navbar is hidden.
         // If navbar is visible, let super handle it so Android moves focus between buttons.
         if (!pointerMode && webView.getVisibility() == View.VISIBLE && webView.hasFocus()) {
-            // Scroll only — let the page's own JS handle element focus (YouTube, etc.)
             if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                 webView.evaluateJavascript("window.scrollBy(0,220)", null);
                 return true;
             }
-            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                webView.evaluateJavascript("window.scrollBy(0,-220)", null);
-                return true;
-            }
+            // DPAD_UP is handled in dispatchKeyEvent() — WebView consumes it there before this
+            // method ever runs (see that override for why).
             // LEFT/RIGHT/CENTER: Activity's default View.FocusFinder only walks native Android
             // views, so once the navbar is hidden there's nothing else for it to land on and
             // the key just dies here — confirmed on-device (stuck past the first focused page
