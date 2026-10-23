@@ -438,9 +438,12 @@ public class MainActivity extends Activity {
 
         String finalUrl = url;
         card.setOnClickListener(v -> {
-            currentMode = NAV_BRAVE;
+            // Hardcoding NAV_BRAVE here used to mislabel reopened YouTube pages, which broke the
+            // YouTube-specific BACK-to-menu handling below (isYoutube in onKeyDown) for anything
+            // reopened from Recientes.
+            currentMode = finalUrl.contains("youtube.com") ? NAV_YT_WEB : NAV_BRAVE;
             showBrowser();
-            configureWebViewForMode(NAV_BRAVE);
+            configureWebViewForMode(currentMode);
             applyRegionCookies();
             updateVpnButton();
             loadUrl(applyRegion(finalUrl));
