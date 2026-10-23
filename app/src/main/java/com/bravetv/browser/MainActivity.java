@@ -1177,6 +1177,32 @@ public class MainActivity extends Activity {
                 webView.evaluateJavascript("window.scrollBy(0,-220)", null);
                 return true;
             }
+            // LEFT/RIGHT/CENTER: Activity's default View.FocusFinder only walks native Android
+            // views, so once the navbar is hidden there's nothing else for it to land on and
+            // the key just dies here — confirmed on-device (stuck past the first focused page
+            // element, Buscar/Duck.ai/☰ all unreachable). The page's own injectDpadNavigation()
+            // listener is what actually walks focus between page elements, so these three still
+            // need to be forwarded into it as a synthetic DOM event, same as before. keyCode on
+            // a KeyboardEventInit is spec-inert in Chromium (read-only, meant to come from the
+            // real native event) — defineProperty is the only way to actually set it post-construct.
+            int jsKey = keyCode == KeyEvent.KEYCODE_DPAD_LEFT ? 37
+                : keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? 39 : -1;
+            if (jsKey != -1) {
+                webView.evaluateJavascript(
+                    "(function(){var e=new KeyboardEvent('keydown',{bubbles:true,cancelable:true});" +
+                    "Object.defineProperty(e,'keyCode',{get:function(){return " + jsKey + ";}});" +
+                    "Object.defineProperty(e,'which',{get:function(){return " + jsKey + ";}});" +
+                    "document.dispatchEvent(e);})()", null);
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                webView.evaluateJavascript(
+                    "(function(){var el=document.activeElement;" +
+                    "if(el&&el!==document.body){el.click();}else{" +
+                    "var a=document.querySelectorAll('a[href],button');" +
+                    "if(a.length)a[0].click();}})()", null);
+                return true;
+            }
         }
         return super.onKeyDown(keyCode, event);
     }
