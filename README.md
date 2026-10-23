@@ -57,14 +57,11 @@
 
 ## 📦 Instalación
 
-### Opción A — Descargar APK precompilado (recomendado)
+### Opción A — Descarga directa (recomendado)
 
-1. Ve a la pestaña **[Actions](../../actions/workflows/build.yml)** de este repositorio
-2. Abre el workflow más reciente con ✅ verde
-3. Descarga el artefacto **`BraveTV-Browser-APK`** (archivo `.zip`)
-4. Extrae el `.apk` del zip
+**[⬇ BraveTVBrowser-v1.1.0.apk](releases/BraveTVBrowser-v1.1.0.apk)** — 4.1 MB · Android 5.0+
 
-> El APK se genera automáticamente en cada push. Si prefieres compilarlo tú mismo, consulta la sección [Compilar](#-compilar-desde-el-código-fuente).
+> También puedes ir a la pestaña **[Actions](../../actions/workflows/build.yml)** para descargar la última versión compilada automáticamente por CI.
 
 ### Transferir e instalar en tu Android TV
 
