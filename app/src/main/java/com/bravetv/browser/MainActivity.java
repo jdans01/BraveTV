@@ -181,9 +181,19 @@ public class MainActivity extends Activity {
         if (hide == navBarHidden) return;
         navBarHidden = hide;
         if (hide) {
-            navBar.animate().translationY(-navBar.getHeight()).setDuration(300).start();
+            navBar.animate()
+                .translationY(-navBar.getHeight() - dp(4))
+                .alpha(0f)
+                .setDuration(350)
+                .withEndAction(() -> navBar.setVisibility(View.INVISIBLE))
+                .start();
         } else {
-            navBar.animate().translationY(0).setDuration(300).start();
+            navBar.setVisibility(View.VISIBLE);
+            navBar.animate()
+                .translationY(0)
+                .alpha(1f)
+                .setDuration(280)
+                .start();
         }
     }
 
@@ -193,10 +203,12 @@ public class MainActivity extends Activity {
 
     private void saveRecent(String url, String title) {
         if (url == null || title == null || title.isEmpty()) return;
-        // Skip generic YouTube home pages
         String lower = title.toLowerCase();
-        if (lower.equals("youtube") || url.matches(".*youtube\\.com/(tv)?\\??$")
-                || url.matches(".*youtube\\.com/\\?.*") || title.length() < 3) return;
+        // Skip generic home pages and duplicate YouTube TV entries
+        if (lower.equals("youtube") || lower.contains("youtube en la televisión")
+                || lower.equals("youtube tv") || lower.equals("youtube music")
+                || url.matches(".*youtube\\.com/tv[?#]?$") || url.matches(".*youtube\\.com/tv\\?gl.*#$")
+                || url.matches(".*youtube\\.com/(\\?.*)?$") || title.length() < 4) return;
 
         try {
             String json = prefs.getString(PREF_RECENTS, "[]");
@@ -251,25 +263,27 @@ public class MainActivity extends Activity {
         card.setClickable(true);
         card.setBackground(getDrawable(R.drawable.card_recent));
 
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(160), dp(88));
-        lp.setMarginEnd(dp(10));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(180), dp(112));
+        lp.setMarginEnd(dp(12));
         card.setLayoutParams(lp);
-        card.setPadding(dp(10), dp(8), dp(10), dp(8));
+        card.setPadding(dp(12), dp(10), dp(12), dp(10));
 
-        // Domain icon character
+        // Domain icon
         String icon = "🌐";
         if (url.contains("youtube.com")) icon = "▶";
+        else if (url.contains("brave.com"))  icon = "B";
+        else if (url.contains("duckduckgo")) icon = "🔒";
         TextView iconView = new TextView(this);
         iconView.setText(icon);
-        iconView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f);
-        iconView.setTextColor(0xFFFF6B35);
+        iconView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f);
+        iconView.setTextColor(url.contains("youtube") ? 0xFFEF4444 : 0xFFC084FC);
         iconView.setGravity(android.view.Gravity.CENTER);
         card.addView(iconView);
 
         TextView titleView = new TextView(this);
         titleView.setText(title);
-        titleView.setTextColor(0xFFCCCCCC);
-        titleView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f);
+        titleView.setTextColor(0xFFD0D0E8);
+        titleView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f);
         titleView.setMaxLines(2);
         titleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
         titleView.setGravity(android.view.Gravity.CENTER);
@@ -613,16 +627,24 @@ public class MainActivity extends Activity {
                         "setInterval(check,3000);})()", null);
                 }
 
-                // Fullscreen / auto-hide navbar detector
+                // Fullscreen / auto-hide navbar — covers YouTube web + YouTube TV
                 view.evaluateJavascript(
                     "(function(){var _fs=false;" +
+                    "function isFS(){" +
+                    "  if(!!document.fullscreenElement||!!document.webkitFullscreenElement) return true;" +
+                    "  var v=document.querySelector('video');" +
+                    "  if(!v||v.paused||v.currentTime<1) return false;" +
+                    // YouTube web fullscreen button active
+                    "  if(document.querySelector('.ytp-fullscreen')) return true;" +
+                    // YouTube TV: video fills the whole viewport
+                    "  var r=v.getBoundingClientRect();" +
+                    "  return r.width>=window.innerWidth*0.95&&r.height>=window.innerHeight*0.85;" +
+                    "}" +
                     "setInterval(function(){" +
-                    "var v=document.querySelector('video');" +
-                    "var fs=!!document.fullscreenElement||" +
-                    "(!!v&&!v.paused&&v.currentTime>2&&" +
-                    "!!document.querySelector('.ytp-fullscreen'));" +
-                    "if(fs!==_fs){_fs=fs;" +
-                    "if(typeof BraveTV!=='undefined')BraveTV.onFullscreen(fs);}},1500);})()", null);
+                    "  var fs=isFS();" +
+                    "  if(fs!==_fs){_fs=fs;" +
+                    "    if(typeof BraveTV!=='undefined')BraveTV.onFullscreen(fs);}" +
+                    "},1200);})()", null);
             }
 
             @Override

@@ -4,39 +4,39 @@
     android:layout_height="match_parent"
     android:background="#0C0C14">
 
-    <!-- NAV BAR -->
+    <!-- NAV BAR — altura 56dp, se oculta en fullscreen -->
     <LinearLayout
         android:id="@+id/navBar"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:background="#0F0F1A"
+        android:layout_height="56dp"
+        android:background="#0D0D1C"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="10dp"
-        android:paddingEnd="10dp"
-        android:elevation="8dp"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:elevation="10dp"
         android:visibility="gone">
 
         <Button
             android:id="@+id/btnYoutube"
             android:layout_width="wrap_content"
-            android:layout_height="42dp"
+            android:layout_height="40dp"
             android:text="&#9654; Inicio"
             android:textColor="#F1F0FF"
             android:textSize="13sp"
             android:background="@drawable/btn_primary"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
             android:focusable="true"
             android:nextFocusRight="@id/btnSearch" />
 
         <Button
             android:id="@+id/btnSearch"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:text="&#128269;"
             android:textColor="#F1F0FF"
-            android:textSize="16sp"
+            android:textSize="15sp"
             android:background="@drawable/btn_nav"
             android:layout_marginStart="6dp"
             android:focusable="true"
@@ -46,7 +46,7 @@
         <EditText
             android:id="@+id/urlBar"
             android:layout_width="0dp"
-            android:layout_height="38dp"
+            android:layout_height="36dp"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="8dp"
@@ -64,11 +64,10 @@
             android:nextFocusLeft="@id/btnSearch"
             android:nextFocusRight="@id/btnBlockCount" />
 
-        <!-- Contador de bloqueos -->
         <TextView
             android:id="@+id/btnBlockCount"
             android:layout_width="wrap_content"
-            android:layout_height="38dp"
+            android:layout_height="36dp"
             android:text="&#128683; 0"
             android:textColor="#4ADE80"
             android:textSize="12sp"
@@ -82,7 +81,7 @@
         <Button
             android:id="@+id/btnVpn"
             android:layout_width="wrap_content"
-            android:layout_height="42dp"
+            android:layout_height="40dp"
             android:text="&#127758; US"
             android:textColor="#F1F0FF"
             android:textSize="11sp"
@@ -96,11 +95,11 @@
 
         <Button
             android:id="@+id/btnBack"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:text="&#9664;"
             android:textColor="#F1F0FF"
-            android:textSize="16sp"
+            android:textSize="15sp"
             android:background="@drawable/btn_nav"
             android:layout_marginStart="5dp"
             android:focusable="true"
@@ -109,39 +108,39 @@
 
         <Button
             android:id="@+id/btnForward"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:text="&#9654;"
             android:textColor="#F1F0FF"
-            android:textSize="16sp"
+            android:textSize="15sp"
             android:background="@drawable/btn_nav"
-            android:layout_marginStart="5dp"
+            android:layout_marginStart="4dp"
             android:focusable="true"
             android:nextFocusLeft="@id/btnBack"
             android:nextFocusRight="@id/btnRefresh" />
 
         <Button
             android:id="@+id/btnRefresh"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:text="&#8635;"
             android:textColor="#F1F0FF"
-            android:textSize="20sp"
+            android:textSize="19sp"
             android:background="@drawable/btn_nav"
-            android:layout_marginStart="5dp"
+            android:layout_marginStart="4dp"
             android:focusable="true"
             android:nextFocusLeft="@id/btnForward"
             android:nextFocusRight="@id/btnHome" />
 
         <Button
             android:id="@+id/btnHome"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:text="&#8962;"
             android:textColor="#F1F0FF"
-            android:textSize="20sp"
+            android:textSize="19sp"
             android:background="@drawable/btn_nav"
-            android:layout_marginStart="5dp"
+            android:layout_marginStart="4dp"
             android:focusable="true"
             android:nextFocusLeft="@id/btnRefresh"
             android:nextFocusDown="@id/webView" />
@@ -157,11 +156,11 @@
         android:progressTint="#C084FC"
         android:visibility="gone" />
 
+    <!-- WebView ocupa TODA la pantalla para que el video llene el espacio -->
     <WebView
         android:id="@+id/webView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/navBar"
         android:focusable="true"
         android:focusableInTouchMode="true"
         android:visibility="gone" />
@@ -186,9 +185,9 @@
         android:orientation="vertical"
         android:visibility="gone" />
 
-    <!-- ═══════════════════════════════════════════ -->
-    <!--              PANTALLA DE INICIO             -->
-    <!-- ═══════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!--                PANTALLA DE INICIO                   -->
+    <!-- ═══════════════════════════════════════════════════ -->
     <ScrollView
         android:id="@+id/homeScreen"
         android:layout_width="match_parent"
@@ -200,15 +199,17 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="32dp">
+            android:paddingTop="28dp"
+            android:paddingBottom="36dp"
+            android:paddingStart="48dp"
+            android:paddingEnd="48dp">
 
-            <!-- Cabecera -->
+            <!-- ── Cabecera ── -->
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
-                android:layout_marginTop="32dp"
-                android:layout_marginBottom="6dp"
+                android:layout_marginBottom="4dp"
                 android:orientation="vertical"
                 android:gravity="center">
 
@@ -217,28 +218,28 @@
                     android:layout_height="wrap_content"
                     android:text="BraveTV"
                     android:textColor="#C084FC"
-                    android:textSize="32sp"
+                    android:textSize="34sp"
                     android:textStyle="bold"
-                    android:letterSpacing="0.05" />
+                    android:letterSpacing="0.04" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Browser"
-                    android:textColor="#F1F0FF"
-                    android:textSize="17sp"
-                    android:letterSpacing="0.15"
-                    android:layout_marginTop="-4dp" />
+                    android:textColor="#9090B0"
+                    android:textSize="15sp"
+                    android:letterSpacing="0.18"
+                    android:layout_marginTop="-2dp" />
 
             </LinearLayout>
 
-            <!-- Píldora VPN + contador bloqueos -->
+            <!-- ── Chips de estado ── -->
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
-                android:layout_marginTop="12dp"
-                android:layout_marginBottom="28dp"
+                android:layout_marginTop="14dp"
+                android:layout_marginBottom="24dp"
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
@@ -249,11 +250,11 @@
                     android:text="&#127758; VPN AUTO · EE.UU."
                     android:textColor="#4ADE80"
                     android:textSize="12sp"
-                    android:background="#0D2218"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp" />
+                    android:background="@drawable/chip_green"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="7dp"
+                    android:paddingBottom="7dp" />
 
                 <TextView
                     android:id="@+id/homeBlockCount"
@@ -262,48 +263,46 @@
                     android:text="&#128683; 0 bloqueados"
                     android:textColor="#FB923C"
                     android:textSize="12sp"
-                    android:background="#1E100A"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp"
+                    android:background="@drawable/chip_red"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="7dp"
+                    android:paddingBottom="7dp"
                     android:layout_marginStart="10dp" />
 
             </LinearLayout>
 
-            <!-- Tarjetas de modo — paleta unificada -->
+            <!-- ── Cards de modo ── -->
             <LinearLayout
                 android:id="@+id/homeCards"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="40dp"
-                android:layout_marginEnd="40dp"
                 android:orientation="horizontal"
                 android:gravity="center"
                 android:weightSum="4">
 
-                <!-- Brave Browser → search.brave.com -->
+                <!-- Brave Browser -->
                 <LinearLayout
                     android:id="@+id/cardBrave"
                     android:layout_width="0dp"
-                    android:layout_height="180dp"
+                    android:layout_height="200dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="10dp"
+                    android:layout_marginEnd="8dp"
                     android:background="@drawable/card_mode"
                     android:orientation="vertical"
                     android:gravity="center"
-                    android:padding="16dp"
+                    android:padding="18dp"
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusRight="@id/cardTor">
 
                     <TextView
-                        android:layout_width="52dp"
-                        android:layout_height="52dp"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
                         android:background="@drawable/icon_brave_circle"
                         android:text="B"
                         android:textColor="#FFFFFF"
-                        android:textSize="24sp"
+                        android:textSize="26sp"
                         android:textStyle="bold"
                         android:gravity="center" />
 
@@ -312,9 +311,9 @@
                         android:layout_height="wrap_content"
                         android:text="Brave"
                         android:textColor="#F1F0FF"
-                        android:textSize="14sp"
+                        android:textSize="15sp"
                         android:textStyle="bold"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginTop="12dp"
                         android:gravity="center" />
 
                     <TextView
@@ -322,35 +321,35 @@
                         android:layout_height="wrap_content"
                         android:text="Sin anuncios · VPN auto"
                         android:textColor="#6B6B8A"
-                        android:textSize="10sp"
-                        android:layout_marginTop="4dp"
+                        android:textSize="11sp"
+                        android:layout_marginTop="5dp"
                         android:gravity="center" />
 
                 </LinearLayout>
 
-                <!-- Brave Privado → duckduckgo.com -->
+                <!-- Brave Privado -->
                 <LinearLayout
                     android:id="@+id/cardTor"
                     android:layout_width="0dp"
-                    android:layout_height="180dp"
+                    android:layout_height="200dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="10dp"
+                    android:layout_marginEnd="8dp"
                     android:background="@drawable/card_mode"
                     android:orientation="vertical"
                     android:gravity="center"
-                    android:padding="16dp"
+                    android:padding="18dp"
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusLeft="@id/cardBrave"
                     android:nextFocusRight="@id/cardYtTv">
 
                     <TextView
-                        android:layout_width="52dp"
-                        android:layout_height="52dp"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
                         android:background="@drawable/icon_private_circle"
                         android:text="&#128274;"
                         android:textColor="#FFFFFF"
-                        android:textSize="22sp"
+                        android:textSize="24sp"
                         android:gravity="center" />
 
                     <TextView
@@ -358,9 +357,9 @@
                         android:layout_height="wrap_content"
                         android:text="Privado"
                         android:textColor="#F1F0FF"
-                        android:textSize="14sp"
+                        android:textSize="15sp"
                         android:textStyle="bold"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginTop="12dp"
                         android:gravity="center" />
 
                     <TextView
@@ -368,35 +367,35 @@
                         android:layout_height="wrap_content"
                         android:text="DuckDuckGo · Incógnito"
                         android:textColor="#6B6B8A"
-                        android:textSize="10sp"
-                        android:layout_marginTop="4dp"
+                        android:textSize="11sp"
+                        android:layout_marginTop="5dp"
                         android:gravity="center" />
 
                 </LinearLayout>
 
-                <!-- YouTube TV → youtube.com/tv -->
+                <!-- YouTube TV -->
                 <LinearLayout
                     android:id="@+id/cardYtTv"
                     android:layout_width="0dp"
-                    android:layout_height="180dp"
+                    android:layout_height="200dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="10dp"
+                    android:layout_marginEnd="8dp"
                     android:background="@drawable/card_mode"
                     android:orientation="vertical"
                     android:gravity="center"
-                    android:padding="16dp"
+                    android:padding="18dp"
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusLeft="@id/cardTor"
                     android:nextFocusRight="@id/cardYtWeb">
 
                     <TextView
-                        android:layout_width="52dp"
-                        android:layout_height="52dp"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
                         android:background="@drawable/icon_yttv_circle"
                         android:text="&#9654;"
                         android:textColor="#FFFFFF"
-                        android:textSize="22sp"
+                        android:textSize="26sp"
                         android:gravity="center" />
 
                     <TextView
@@ -404,9 +403,9 @@
                         android:layout_height="wrap_content"
                         android:text="YouTube TV"
                         android:textColor="#F1F0FF"
-                        android:textSize="14sp"
+                        android:textSize="15sp"
                         android:textStyle="bold"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginTop="12dp"
                         android:gravity="center" />
 
                     <TextView
@@ -414,33 +413,33 @@
                         android:layout_height="wrap_content"
                         android:text="Interfaz televisión"
                         android:textColor="#6B6B8A"
-                        android:textSize="10sp"
-                        android:layout_marginTop="4dp"
+                        android:textSize="11sp"
+                        android:layout_marginTop="5dp"
                         android:gravity="center" />
 
                 </LinearLayout>
 
-                <!-- YouTube Web → youtube.com -->
+                <!-- YouTube Web -->
                 <LinearLayout
                     android:id="@+id/cardYtWeb"
                     android:layout_width="0dp"
-                    android:layout_height="180dp"
+                    android:layout_height="200dp"
                     android:layout_weight="1"
                     android:background="@drawable/card_mode"
                     android:orientation="vertical"
                     android:gravity="center"
-                    android:padding="16dp"
+                    android:padding="18dp"
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusLeft="@id/cardYtTv">
 
                     <TextView
-                        android:layout_width="52dp"
-                        android:layout_height="52dp"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
                         android:background="@drawable/icon_ytweb_circle"
                         android:text="YT"
                         android:textColor="#FFFFFF"
-                        android:textSize="18sp"
+                        android:textSize="20sp"
                         android:textStyle="bold"
                         android:gravity="center" />
 
@@ -449,9 +448,9 @@
                         android:layout_height="wrap_content"
                         android:text="YouTube Web"
                         android:textColor="#F1F0FF"
-                        android:textSize="14sp"
+                        android:textSize="15sp"
                         android:textStyle="bold"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginTop="12dp"
                         android:gravity="center" />
 
                     <TextView
@@ -459,32 +458,35 @@
                         android:layout_height="wrap_content"
                         android:text="Versión escritorio"
                         android:textColor="#6B6B8A"
-                        android:textSize="10sp"
-                        android:layout_marginTop="4dp"
+                        android:textSize="11sp"
+                        android:layout_marginTop="5dp"
                         android:gravity="center" />
 
                 </LinearLayout>
 
             </LinearLayout>
 
-            <!-- Recientes -->
+            <!-- ── Recientes ── -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="48dp"
-                android:layout_marginTop="28dp"
-                android:layout_marginBottom="10dp"
+                android:layout_marginTop="30dp"
+                android:layout_marginBottom="12dp"
                 android:text="RECIENTES"
                 android:textColor="#4A4A6A"
                 android:textSize="11sp"
-                android:letterSpacing="0.12" />
+                android:letterSpacing="0.14"
+                android:textStyle="bold" />
 
             <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingStart="40dp"
-                android:paddingEnd="40dp"
-                android:scrollbars="none">
+                android:layout_marginStart="-48dp"
+                android:layout_marginEnd="-48dp"
+                android:paddingStart="48dp"
+                android:paddingEnd="48dp"
+                android:scrollbars="none"
+                android:clipToPadding="false">
 
                 <LinearLayout
                     android:id="@+id/recentsList"
@@ -499,9 +501,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="28dp"
                 android:text="ATRÁS = salir  ·  Mantén VPN = elegir región"
-                android:textColor="#2E2E44"
+                android:textColor="#28283C"
                 android:textSize="11sp" />
 
         </LinearLayout>
