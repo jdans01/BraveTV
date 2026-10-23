@@ -905,6 +905,7 @@ public class MainActivity extends Activity {
             "    return;" +
             "  }" +
             "  var nxt=nearest(cur,dir);" +
+            "  console.log('BTVDIAG dir='+dir+' els='+getEls().length+' cur='+(cur.tagName+'#'+cur.id)+' nxt='+(nxt&&(nxt.tagName+'#'+nxt.id)));" +
             "  if(nxt){nxt.focus();nxt.scrollIntoView({block:'nearest'});}" +
             "  else if(dir==='down')window.scrollBy(0,200);" +
             // Nothing above the current item (top of a video grid, etc.) — hand off to the
