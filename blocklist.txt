@@ -1,0 +1,82 @@
+# BraveTV Browser — Remote Blocklist
+# Formato: una entrada por línea
+# Líneas con # son comentarios
+# Tipos: HOST: dominio completo | PATTERN: fragmento de URL
+# Actualizar este archivo en GitHub parchea todos los dispositivos sin nuevo APK
+# Última revisión: 2025-10
+
+# ── IMA SDK (motor de anuncios de video YouTube) ──────────────────────────────
+HOST:imasdk.googleapis.com
+HOST:ima.googleapis.com
+
+# ── Google Ads ────────────────────────────────────────────────────────────────
+HOST:ad.youtube.com
+HOST:ads.youtube.com
+HOST:googleadservices.com
+HOST:www.googleadservices.com
+HOST:googlesyndication.com
+HOST:pagead2.googlesyndication.com
+HOST:tpc.googlesyndication.com
+HOST:ade.googlesyndication.com
+HOST:adservice.google.com
+HOST:adservice.google.com.mx
+HOST:adservice.google.co
+
+# ── DoubleClick ───────────────────────────────────────────────────────────────
+HOST:doubleclick.net
+HOST:ad.doubleclick.net
+HOST:stats.g.doubleclick.net
+HOST:cm.g.doubleclick.net
+HOST:securepubads.g.doubleclick.net
+HOST:pubads.g.doubleclick.net
+HOST:static.doubleclick.net
+HOST:survey.g.doubleclick.net
+HOST:2mdn.net
+
+# ── Google Tag / Analytics ────────────────────────────────────────────────────
+HOST:googletagmanager.com
+HOST:googletagservices.com
+HOST:analytics.google.com
+HOST:google-analytics.com
+
+# ── Consentimiento / anti-adblocker ──────────────────────────────────────────
+HOST:fundingchoicesmessages.google.com
+
+# ── Redes sociales (trackers) ─────────────────────────────────────────────────
+HOST:connect.facebook.net
+HOST:graph.facebook.com
+
+# ── Redes de anuncios de terceros ─────────────────────────────────────────────
+HOST:outbrain.com
+HOST:taboola.com
+HOST:moatads.com
+HOST:amazon-adsystem.com
+HOST:adsafeprotected.com
+HOST:adnxs.com
+HOST:sb.scorecardresearch.com
+HOST:pixel.quantserve.com
+
+# ── Patrones de URL (fragmentos que identifican streams/requests de anuncios) ─
+PATTERN:ctier=L
+PATTERN:ctier%3DL
+PATTERN:youtube.com/api/stats/ads
+PATTERN:youtube.com/pagead
+PATTERN:youtube.com/ptracking
+PATTERN:youtube.com/get_video_info
+PATTERN:youtube.com/api/stats/qoe
+PATTERN:youtube.com/api/stats/atr
+PATTERN:youtube.com/youtubei/v1/log_event
+PATTERN:/pagead/
+PATTERN:/ads/
+PATTERN:/adview
+PATTERN:ad_type=
+PATTERN:/ptracking
+PATTERN:ad_video_id=
+PATTERN:&ad_cpn=
+PATTERN:&oad=1
+PATTERN:&adformat=
+PATTERN:&adurl=
+PATTERN:/ima/
+PATTERN:imasdk
+PATTERN:fundingchoicesmessages
+PATTERN:consent.youtube
