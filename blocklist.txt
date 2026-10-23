@@ -80,3 +80,8 @@ PATTERN:/ima/
 PATTERN:imasdk
 PATTERN:fundingchoicesmessages
 PATTERN:consent.youtube
+
+# ════════════════════════════════════════════════════════════
+# AUTO-GENERATED — 2026-10-23 — no editar esta sección manualmente
+# Fuentes: uBlock Origin, AdGuard Mobile Ads, EasyPrivacy
+# ════════════════════════════════════════════════════════════

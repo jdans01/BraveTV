@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""
+update_blocklist.py — Actualiza blocklist.txt con entradas de fuentes públicas.
+
+Fuentes:
+  - uBlock Origin filters (YouTube-específico)
+  - AdGuard Mobile Ads & Tracking
+  - EasyPrivacy (dominios de tracking)
+  - Lista manual en blocklist.txt (preservada siempre)
+
+Corre semanalmente vía GitHub Actions.
+"""
+
+import urllib.request
+import re
+import sys
+from datetime import datetime, timezone
+
+# ── Fuentes públicas ──────────────────────────────────────────────────────────
+SOURCES = [
+    {
+        "name": "uBlock Origin — filters (YouTube/Google Ads)",
+        "url": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt",
+        "keywords": ["youtube", "google", "googlevideo", "doubleclick", "googleapis",
+                     "adsystem", "adservice", "imasdk", "pagead", "ima.", "adnxs",
+                     "taboola", "outbrain", "scorecardresearch", "googlesyndication"],
+    },
+    {
+        "name": "uBlock Origin — badware risks",
+        "url": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt",
+        "keywords": ["google", "doubleclick", "youtube", "ad", "track"],
+    },
+    {
+        "name": "AdGuard Mobile Ads",
+        "url": "https://filters.adthing.net/filters/2.txt",
+        "keywords": ["google", "youtube", "doubleclick", "ad", "track", "analytics"],
+    },
+    {
+        "name": "EasyPrivacy",
+        "url": "https://easylist.to/easylist/easyprivacy.txt",
+        "keywords": ["google-analytics", "doubleclick", "googlesyndication",
+                     "googletagmanager", "scorecardresearch", "quantserve"],
+    },
+]
+
+# ── Dominios que NUNCA se bloquean (falsos positivos) ─────────────────────────
+WHITELIST = {
+    "youtube.com", "www.youtube.com", "youtu.be",
+    "googleapis.com",          # genérico — solo bloqueamos subdominios específicos
+    "google.com", "www.google.com",
+    "gstatic.com", "ytimg.com", "yt3.ggpht.com",
+    "googlevideo.com",         # streams de video legítimos
+    "accounts.google.com",
+}
+
+# ── Subdominios de googleapis que sí se bloquean ─────────────────────────────
+GOOGLEAPIS_BLOCK = {"imasdk", "ima", "pagead"}
+
+
+def fetch(url: str) -> str:
+    req = urllib.request.Request(url, headers={"User-Agent": "BraveTVBlocklistUpdater/1.0"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return r.read().decode("utf-8", errors="ignore")
+
+
+def extract_hosts(content: str, keywords: list) -> set:
+    """Extrae dominios de reglas ABP/uBlock: ||domain^ y /etc/hosts."""
+    hosts = set()
+    for line in content.splitlines():
+        line = line.strip()
+        if not line or line.startswith(("!", "#", "@@", "/")):
+            continue
+        # ABP/uBlock host rule: ||example.com^
+        m = re.match(r"^\|\|([a-zA-Z0-9.\-]+)\^", line)
+        if m:
+            host = m.group(1).lower()
+            if _relevant(host, keywords) and _safe(host):
+                hosts.add(host)
+            continue
+        # /etc/hosts format: 0.0.0.0 example.com
+        m = re.match(r"^(?:0\.0\.0\.0|127\.0\.0\.1)\s+([a-zA-Z0-9.\-]+)", line)
+        if m:
+            host = m.group(1).lower()
+            if _relevant(host, keywords) and _safe(host):
+                hosts.add(host)
+    return hosts
+
+
+def _relevant(host: str, keywords: list) -> bool:
+    return any(kw in host for kw in keywords)
+
+
+def _safe(host: str) -> bool:
+    if host in WHITELIST:
+        return False
+    if host == "googleapis.com":
+        return False
+    if host.endswith(".googleapis.com"):
+        sub = host.split(".googleapis.com")[0].split(".")[-1]
+        return sub in GOOGLEAPIS_BLOCK
+    # Skip bare TLDs or very short hosts
+    if "." not in host or len(host) < 5:
+        return False
+    return True
+
+
+def read_manual_entries(path: str):
+    """Lee las entradas manuales (con # Manual o al inicio del archivo hasta el primer bloque auto)."""
+    hosts, patterns, header_lines = set(), set(), []
+    in_auto = False
+    with open(path) as f:
+        for line in f:
+            stripped = line.rstrip()
+            if "AUTO-GENERATED" in stripped:
+                in_auto = True
+                break
+            header_lines.append(stripped)
+            if stripped.startswith("HOST:"):
+                hosts.add(stripped[5:].strip())
+            elif stripped.startswith("PATTERN:"):
+                patterns.add(stripped[8:].strip())
+    return hosts, patterns, header_lines
+
+
+def write_blocklist(path: str, manual_hosts: set, manual_patterns: set,
+                    header_lines: list, auto_hosts: set):
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    with open(path, "w") as f:
+        # Cabecera manual preservada
+        for line in header_lines:
+            f.write(line + "\n")
+
+        # Separador bloque automático
+        f.write("\n")
+        f.write("# ════════════════════════════════════════════════════════════\n")
+        f.write(f"# AUTO-GENERATED — {today} — no editar esta sección manualmente\n")
+        f.write(f"# Fuentes: uBlock Origin, AdGuard Mobile Ads, EasyPrivacy\n")
+        f.write("# ════════════════════════════════════════════════════════════\n")
+
+        # Hosts automáticos (excluye los que ya están en la sección manual)
+        new_hosts = sorted(auto_hosts - manual_hosts)
+        if new_hosts:
+            f.write(f"\n# {len(new_hosts)} dominios de fuentes públicas\n")
+            for h in new_hosts:
+                f.write(f"HOST:{h}\n")
+
+    print(f"✓ blocklist.txt actualizado — {len(manual_hosts)} manuales + {len(new_hosts)} automáticos")
+
+
+def main():
+    path = "blocklist.txt"
+    manual_hosts, manual_patterns, header_lines = read_manual_entries(path)
+    print(f"  Entradas manuales: {len(manual_hosts)} hosts, {len(manual_patterns)} patrones")
+
+    auto_hosts = set()
+    for source in SOURCES:
+        try:
+            print(f"  Descargando: {source['name']} …")
+            content = fetch(source["url"])
+            found = extract_hosts(content, source["keywords"])
+            print(f"    → {len(found)} dominios relevantes")
+            auto_hosts.update(found)
+        except Exception as e:
+            print(f"    ✗ Error: {e}", file=sys.stderr)
+
+    print(f"  Total automáticos únicos: {len(auto_hosts)}")
+    write_blocklist(path, manual_hosts, manual_patterns, header_lines, auto_hosts)
+
+
+if __name__ == "__main__":
+    main()
