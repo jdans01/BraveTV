@@ -10,15 +10,37 @@ android {
         applicationId "com.bravetv.browser"
         minSdk 21
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 3
+        versionName "2.1"
+    }
+
+    // Release builds need a STABLE signature across runs for in-app updates to work at
+    // all — installing an APK with a different signature over an existing app is always
+    // rejected by Android, update-checker or not. CI provides the keystore via env vars
+    // (see .github/workflows/build.yml); local dev builds without those vars fall back to
+    // the debug key so `gradle assembleDebug` during development is unaffected.
+    signingConfigs {
+        release {
+            def ksPath = System.getenv("RELEASE_KEYSTORE_PATH")
+            if (ksPath != null) {
+                storeFile file(ksPath)
+                storePassword System.getenv("RELEASE_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword System.getenv("RELEASE_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug
+            signingConfig System.getenv("RELEASE_KEYSTORE_PATH") != null
+                ? signingConfigs.release : signingConfigs.debug
         }
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     compileOptions {

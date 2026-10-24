@@ -28,14 +28,29 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build Debug APK
+      - name: Decode release keystore
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/bravetv-release.jks"
+          echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/bravetv-release.jks" >> "$GITHUB_ENV"
+
+      - name: Build Release APK
         working-directory: .
-        run: gradle assembleDebug --stacktrace
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        # Same signing key on every run (from the secrets above) is what makes in-app
+        # updates installable over the previous version at all — a debug/ephemeral key
+        # that changes every build never can be, no matter what the app itself does.
+        run: gradle assembleRelease --stacktrace
 
       - name: Rename APK
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/BraveTVBrowser.apk
+          cp app/build/outputs/apk/release/app-release.apk dist/BraveTVBrowser.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

@@ -4,6 +4,7 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.PointF;
@@ -291,6 +292,138 @@ public class MainActivity extends Activity {
             for (String p : adPatterns) if (url.contains(p)) return true;
         } catch (Exception ignored) {}
         return false;
+    }
+
+    // ─── In-app update (requires every CI build to share one signature — see
+    // RELEASE_KEYSTORE_* secrets in the build workflow; installing over a differently-
+    // signed APK is always rejected by Android no matter what this code does) ──────────
+    private static final String UPDATE_API_URL =
+        "https://api.github.com/repos/jdans01/BraveTV/releases/latest";
+    private static final String PREF_UPDATE_CHECK_TIME = "update_check_time";
+    private static final long   UPDATE_CHECK_TTL_MS = 12 * 60 * 60 * 1000L;
+
+    // Plain !equals() isn't enough here — the "latest" GitHub release can be OLDER than
+    // what's actually installed right after a local/manual build bumps VERSION_NAME ahead
+    // of the last tagged release (confirmed on-device: it offered to "update" v2.1 down to
+    // the still-tagged v2.0). Numeric per-segment comparison so it only ever prompts
+    // forward.
+    private static boolean isNewerVersion(String latest, String current) {
+        String[] a = latest.split("\\.");
+        String[] b = current.split("\\.");
+        int len = Math.max(a.length, b.length);
+        for (int i = 0; i < len; i++) {
+            int av = i < a.length ? parseVersionPart(a[i]) : 0;
+            int bv = i < b.length ? parseVersionPart(b[i]) : 0;
+            if (av != bv) return av > bv;
+        }
+        return false;
+    }
+
+    private static int parseVersionPart(String s) {
+        try { return Integer.parseInt(s.replaceAll("[^0-9]", "")); } catch (Exception e) { return 0; }
+    }
+
+    private void checkForUpdate() {
+        if (System.currentTimeMillis() - prefs.getLong(PREF_UPDATE_CHECK_TIME, 0) < UPDATE_CHECK_TTL_MS)
+            return;
+        bgExecutor.execute(() -> {
+            try {
+                HttpURLConnection conn = (HttpURLConnection) new URL(UPDATE_API_URL).openConnection();
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
+                conn.setRequestProperty("User-Agent", "BraveTVBrowser/" + BuildConfig.VERSION_NAME);
+                conn.setRequestProperty("Accept", "application/vnd.github+json");
+                if (conn.getResponseCode() != 200) return;
+                StringBuilder sb = new StringBuilder();
+                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line);
+                br.close();
+                conn.disconnect();
+                prefs.edit().putLong(PREF_UPDATE_CHECK_TIME, System.currentTimeMillis()).apply();
+
+                JSONObject release = new JSONObject(sb.toString());
+                String tag = release.optString("tag_name", "");
+                String latest = tag.startsWith("v") ? tag.substring(1) : tag;
+                if (latest.isEmpty() || !isNewerVersion(latest, BuildConfig.VERSION_NAME)) return;
+
+                JSONArray assets = release.optJSONArray("assets");
+                String apkUrl = null;
+                if (assets != null) {
+                    for (int i = 0; i < assets.length(); i++) {
+                        JSONObject a = assets.getJSONObject(i);
+                        if (a.optString("name", "").endsWith(".apk")) {
+                            apkUrl = a.optString("browser_download_url");
+                            break;
+                        }
+                    }
+                }
+                if (apkUrl == null) return;
+                String finalUrl = apkUrl, finalLatest = latest;
+                handler.post(() -> showUpdateDialog(finalLatest, finalUrl));
+            } catch (Exception ignored) {}
+        });
+    }
+
+    private void showUpdateDialog(String version, String apkUrl) {
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("🦁 Nueva versión disponible")
+            .setMessage("BraveTV Browser v" + version + " está disponible (tenés v"
+                + BuildConfig.VERSION_NAME + "). ¿Actualizar ahora?")
+            .setPositiveButton("Actualizar", (d, w) -> startUpdateDownload(apkUrl, version))
+            .setNegativeButton("Más tarde", null)
+            .show();
+    }
+
+    private void startUpdateDownload(String apkUrl, String version) {
+        if (!getPackageManager().canRequestPackageInstalls()) {
+            Toast.makeText(this,
+                "Activá \"Instalar apps desconocidas\" para BraveTV y volvé a intentar",
+                Toast.LENGTH_LONG).show();
+            try {
+                startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) {}
+            return;
+        }
+        Toast.makeText(this, "⬇️ Descargando actualización…", Toast.LENGTH_SHORT).show();
+        bgExecutor.execute(() -> {
+            try {
+                File dir = new File(getExternalFilesDir(null), "updates");
+                if (!dir.exists()) dir.mkdirs();
+                File apkFile = new File(dir, "BraveTVBrowser-" + version + ".apk");
+                HttpURLConnection conn = (HttpURLConnection) new URL(apkUrl).openConnection();
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(30000);
+                int code = conn.getResponseCode();
+                if (code != 200) throw new java.io.IOException("HTTP " + code);
+                java.io.InputStream in = conn.getInputStream();
+                FileOutputStream out = new FileOutputStream(apkFile);
+                byte[] buf = new byte[16384];
+                int n;
+                while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+                in.close();
+                out.close();
+                conn.disconnect();
+                handler.post(() -> installApk(apkFile));
+            } catch (Exception e) {
+                handler.post(() -> Toast.makeText(MainActivity.this,
+                    "❌ No se pudo descargar la actualización", Toast.LENGTH_SHORT).show());
+            }
+        });
+    }
+
+    private void installApk(File apkFile) {
+        try {
+            Uri apkUri = androidx.core.content.FileProvider.getUriForFile(
+                this, "com.bravetv.browser.fileprovider", apkFile);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "❌ No se pudo abrir el instalador", Toast.LENGTH_SHORT).show();
+        }
     }
 
     // ─── Región ───────────────────────────────────────────────────────────────
@@ -583,6 +716,7 @@ public class MainActivity extends Activity {
         videoQualityCap = prefs.getString("videoQualityCap", "auto");
         updateHomeQualityLabel();
         initBlocklist(); // seed built-in + load cached remote list
+        checkForUpdate();
 
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
