@@ -621,7 +621,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Cuevana · Tubi"
+                        android:text="Cuevana · Cinecalidad"
                         android:textColor="#6B6B8A"
                         android:textSize="11sp"
                         android:layout_marginTop="5dp"

@@ -1057,9 +1057,9 @@ public class MainActivity extends Activity {
         handler.postDelayed(() -> webView.requestFocus(), 350);
     }
 
-    private static final String[] MOVIE_SITE_LABELS = {"🎬 Cuevana", "📺 Tubi TV"};
+    private static final String[] MOVIE_SITE_LABELS = {"🎬 Cuevana", "🎞️ Cinecalidad"};
     private static final String[] MOVIE_SITE_URLS = {
-        "https://ccuevana3.wtf/inicio", "https://tubitv.com/"
+        "https://ccuevana3.wtf/inicio", "https://cinecalidad.my/"
     };
 
     private void showMoviesDialog() {
@@ -1153,29 +1153,31 @@ public class MainActivity extends Activity {
             "if(document.getElementById('_btv_shield')) return;" +
             "var s=document.createElement('style');s.id='_btv_shield_css';" +
             "s.textContent=" +
-            "'@keyframes btvPulse{0%{transform:scale(1);opacity:.55}" +
-            "50%{transform:scale(1.18);opacity:.95}100%{transform:scale(1);opacity:.55}}" +
+            // A native-looking spinner (rotating ring, YouTube-red accent) instead of the
+            // old pulsing shield emoji — the goal is to read as 'video is loading', the
+            // same thing YouTube's own buffering indicator looks like, not as an obvious
+            // 'ad was blocked here' announcement sitting on top of the thumbnail.
+            "'@keyframes btvSpin{to{transform:rotate(360deg)}}" +
             ".btv-shield{position:fixed;inset:0;z-index:2147483647;display:none;" +
-            "align-items:center;justify-content:center;flex-direction:column;gap:14px;" +
+            "align-items:center;justify-content:center;flex-direction:column;gap:16px;" +
             "background-color:#0b0714;" +
-            // Default (no thumbnail yet): purple gradient. When a poster/thumbnail is
-            // available the tick handler overwrites background-image inline with it plus a
-            // dark gradient layered on top — set as a plain background-image, not a filter,
-            // so it can't blur/darken the .ring/.msg children along with it.
+            // Default (no thumbnail yet): dark gradient. When a thumbnail is available the
+            // tick handler overwrites background-image inline with it plus a dark gradient
+            // layered on top — set as a plain background-image, not a filter, so it can't
+            // blur/darken the .spinner/.msg children along with it.
             "background-image:radial-gradient(circle at 50% 45%,#1a1033 0%,#0b0714 70%);" +
             "background-size:cover;background-position:center;" +
             "font-family:sans-serif;pointer-events:none}" +
             ".btv-shield.on{display:flex}" +
-            ".btv-shield .ring{width:64px;height:64px;border-radius:50%;" +
-            "background:radial-gradient(circle,rgba(192,132,252,0.35),transparent 70%);" +
-            "animation:btvPulse 1.1s ease-in-out infinite;" +
-            "display:flex;align-items:center;justify-content:center;font-size:30px}" +
-            ".btv-shield .msg{font-size:15px;letter-spacing:.3px;color:#fff;" +
+            ".btv-shield .spinner{width:52px;height:52px;border-radius:50%;" +
+            "border:4px solid rgba(255,255,255,0.18);border-top-color:#FF0033;" +
+            "animation:btvSpin .85s linear infinite}" +
+            ".btv-shield .msg{font-size:13px;letter-spacing:.3px;color:#eee;" +
             "text-shadow:0 1px 6px rgba(0,0,0,0.8)}';" +
             "document.head.appendChild(s);" +
             "var d=document.createElement('div');d.id='_btv_shield';d.className='btv-shield';" +
-            "d.innerHTML='<div class=\"ring\">🛡️</div>" +
-            "<div class=\"msg\" id=\"_btv_shield_msg\">Anuncio bloqueado</div>';" +
+            "d.innerHTML='<div class=\"spinner\"></div>" +
+            "<div class=\"msg\" id=\"_btv_shield_msg\">Cargando video\\u2026</div>';" +
             "document.documentElement.appendChild(d);})()", null);
     }
 
@@ -1359,10 +1361,11 @@ public class MainActivity extends Activity {
             "  var shield=document.getElementById('_btv_shield');" +
             "  if(shield){" +
             "    shield.classList.toggle('on',show);" +
-            "    var msgEl=document.getElementById('_btv_shield_msg');" +
+            // Always the same neutral 'loading' text — this is meant to read as normal
+            // video loading, not announce that an ad was caught, so it blends in instead
+            // of standing out as an obvious ad-block screen.
             "    if(show&&vs&&vs.poster){" +
             "      shield.style.backgroundImage='linear-gradient(rgba(8,4,16,.6),rgba(8,4,16,.8)),url(\"'+vs.poster+'\")';" +
-            "      if(msgEl)msgEl.textContent=adMarked?'Anuncio bloqueado':'Cargando\\u2026';" +
             "    } else if(!show){ shield.style.backgroundImage=''; }" +
             "  }" +
             "  if(sk){sk.click();return;}" +
