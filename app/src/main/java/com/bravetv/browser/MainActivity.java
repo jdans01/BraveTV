@@ -71,6 +71,9 @@ public class MainActivity extends Activity {
     private TextView homeQuality;
     private TextView homeUpdateStatus;
     private LinearLayout recentsList;
+    private View favoritesSection;
+    private LinearLayout favoritesList;
+    private Button btnFavorite;
     private SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -655,6 +658,13 @@ public class MainActivity extends Activity {
     }
 
     private void addRecentCard(String url, String title) {
+        addUrlCard(recentsList, url, title, null);
+    }
+
+    // Shared by Recientes and Favoritos — onRemove non-null (favorites) adds long-press
+    // to unsave; recents manage themselves (oldest just falls off MAX_RECENTS) so don't
+    // need one.
+    private void addUrlCard(LinearLayout container, String url, String title, Runnable onRemove) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(android.view.Gravity.CENTER);
@@ -673,9 +683,10 @@ public class MainActivity extends Activity {
         else if (url.contains("brave.com"))  icon = "B";
         else if (url.contains("duckduckgo")) icon = "🔒";
         TextView iconView = new TextView(this);
-        iconView.setText(icon);
+        iconView.setText(onRemove != null ? "★" : icon);
         iconView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f);
-        iconView.setTextColor(url.contains("youtube") ? 0xFFEF4444 : 0xFFC084FC);
+        iconView.setTextColor(onRemove != null ? 0xFFFBBF24
+            : url.contains("youtube") ? 0xFFEF4444 : 0xFFC084FC);
         iconView.setGravity(android.view.Gravity.CENTER);
         card.addView(iconView);
 
@@ -690,6 +701,16 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT));
         card.addView(titleView);
+
+        if (onRemove != null) {
+            TextView hint = new TextView(this);
+            hint.setText("mantén para quitar");
+            hint.setTextColor(0xFF4A4A6A);
+            hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f);
+            hint.setGravity(android.view.Gravity.CENTER);
+            card.addView(hint);
+            card.setOnLongClickListener(v -> { onRemove.run(); return true; });
+        }
 
         // Focus animation
         card.setOnFocusChangeListener((v, focused) -> {
@@ -713,7 +734,105 @@ public class MainActivity extends Activity {
             webView.requestFocus();
         });
 
-        recentsList.addView(card);
+        container.addView(card);
+    }
+
+    // ─── Favoritos — guardar la página actual para acceso rápido ─────────────
+    private static final int MAX_FAVORITES = 8;
+    private static final String PREF_FAVORITES = "favorites_json";
+
+    private boolean isCurrentPageFavorite() {
+        String url = webView.getUrl();
+        if (url == null) return false;
+        try {
+            JSONArray arr = new JSONArray(prefs.getString(PREF_FAVORITES, "[]"));
+            for (int i = 0; i < arr.length(); i++)
+                if (arr.getJSONObject(i).optString("url").equals(url)) return true;
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    private void toggleFavorite() {
+        if (webView.getVisibility() != View.VISIBLE) {
+            Toast.makeText(this, "Abrí una página primero", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String url = webView.getUrl();
+        if (url == null) return;
+        try {
+            JSONArray arr = new JSONArray(prefs.getString(PREF_FAVORITES, "[]"));
+            int existingIdx = -1;
+            for (int i = 0; i < arr.length(); i++)
+                if (arr.getJSONObject(i).optString("url").equals(url)) { existingIdx = i; break; }
+            if (existingIdx >= 0) {
+                removeFavoriteAt(existingIdx);
+                Toast.makeText(this, "☆ Quitado de favoritos", Toast.LENGTH_SHORT).show();
+                updateFavoriteButton();
+                return;
+            }
+        } catch (Exception ignored) {}
+        webView.evaluateJavascript("document.title", result -> {
+            String title = (result == null || result.equals("null")) ? url
+                : result.replaceAll("^\"|\"$", "").trim();
+            if (title.isEmpty()) title = url;
+            saveFavorite(url, title);
+            Toast.makeText(this, "★ Guardado en favoritos", Toast.LENGTH_SHORT).show();
+            updateFavoriteButton();
+        });
+    }
+
+    private void saveFavorite(String url, String title) {
+        try {
+            JSONArray arr = new JSONArray(prefs.getString(PREF_FAVORITES, "[]"));
+            JSONArray filtered = new JSONArray();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                if (!o.optString("url").equals(url)) filtered.put(o);
+            }
+            JSONObject entry = new JSONObject();
+            entry.put("url", url);
+            entry.put("title", title);
+            JSONArray result = new JSONArray();
+            result.put(entry);
+            for (int i = 0; i < filtered.length() && i < MAX_FAVORITES - 1; i++)
+                result.put(filtered.get(i));
+            prefs.edit().putString(PREF_FAVORITES, result.toString()).apply();
+        } catch (Exception ignored) {}
+    }
+
+    private void removeFavoriteAt(int index) {
+        try {
+            JSONArray arr = new JSONArray(prefs.getString(PREF_FAVORITES, "[]"));
+            JSONArray result = new JSONArray();
+            for (int i = 0; i < arr.length(); i++) if (i != index) result.put(arr.get(i));
+            prefs.edit().putString(PREF_FAVORITES, result.toString()).apply();
+            renderFavorites();
+        } catch (Exception ignored) {}
+    }
+
+    private void updateFavoriteButton() {
+        if (btnFavorite == null) return;
+        boolean fav = isCurrentPageFavorite();
+        btnFavorite.setText(fav ? "★" : "☆");
+        btnFavorite.setTextColor(fav ? 0xFFFBBF24 : 0xFFF1F0FF);
+    }
+
+    private void renderFavorites() {
+        if (favoritesSection == null || favoritesList == null) return;
+        favoritesList.removeAllViews();
+        try {
+            JSONArray arr = new JSONArray(prefs.getString(PREF_FAVORITES, "[]"));
+            favoritesSection.setVisibility(arr.length() == 0 ? View.GONE : View.VISIBLE);
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                String url = o.optString("url", "");
+                String title = o.optString("title", url);
+                int idx = i;
+                addUrlCard(favoritesList, url, title, () -> removeFavoriteAt(idx));
+            }
+        } catch (Exception ignored) {
+            favoritesSection.setVisibility(View.GONE);
+        }
     }
 
     private int dp(int value) {
@@ -743,6 +862,10 @@ public class MainActivity extends Activity {
         homeUpdateStatus = findViewById(R.id.homeUpdateStatus);
         if (homeUpdateStatus != null) homeUpdateStatus.setOnClickListener(v -> onUpdateChipClick());
         recentsList    = findViewById(R.id.recentsList);
+        favoritesSection = findViewById(R.id.favoritesSection);
+        favoritesList    = findViewById(R.id.favoritesList);
+        btnFavorite      = findViewById(R.id.btnFavorite);
+        if (btnFavorite != null) btnFavorite.setOnClickListener(v -> toggleFavorite());
         btnBlockCount  = findViewById(R.id.btnBlockCount);
         homeBlockCount = findViewById(R.id.homeBlockCount);
         btnRevealNav   = findViewById(R.id.btnRevealNav);
@@ -852,6 +975,7 @@ public class MainActivity extends Activity {
     private void showHome() {
         setNavBarHidden(false);
         renderRecents();
+        renderFavorites();
         updateHomeVpnStatus();
 
         homeScreen.setAlpha(0f);
@@ -893,10 +1017,6 @@ public class MainActivity extends Activity {
     }
 
     private void launchMode(int mode) {
-        currentMode = mode;
-        showBrowser();
-        configureWebViewForMode(mode);
-
         String url;
         switch (mode) {
             case NAV_BRAVE:
@@ -914,9 +1034,6 @@ public class MainActivity extends Activity {
                     ? "https://www.youtube.com/?gl=" + AUTO_REGIONS[regionIndex] + "&hl=es"
                     : "https://www.youtube.com/";
                 break;
-            case NAV_MOVIES:
-                url = "https://ccuevana3.wtf/inicio";
-                break;
             case NAV_ANIME:
                 url = "https://animeflv.or.at";
                 break;
@@ -924,11 +1041,33 @@ public class MainActivity extends Activity {
                 url = "https://search.brave.com/";
                 break;
         }
+        launchUrl(mode, url);
+    }
 
+    // Shared tail of launchMode() — pulled out so a mode with more than one possible site
+    // (Películas: Cuevana vs Tubi, see showMoviesDialog) can pick the URL itself without
+    // duplicating the browser-setup boilerplate.
+    private void launchUrl(int mode, String url) {
+        currentMode = mode;
+        showBrowser();
+        configureWebViewForMode(mode);
         applyRegionCookies();
         updateVpnButton();
         loadUrl(url);
         handler.postDelayed(() -> webView.requestFocus(), 350);
+    }
+
+    private static final String[] MOVIE_SITE_LABELS = {"🎬 Cuevana", "📺 Tubi TV"};
+    private static final String[] MOVIE_SITE_URLS = {
+        "https://ccuevana3.wtf/inicio", "https://tubitv.com/"
+    };
+
+    private void showMoviesDialog() {
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("🎬 Elegir plataforma")
+            .setItems(MOVIE_SITE_LABELS, (d, which) -> launchUrl(NAV_MOVIES, MOVIE_SITE_URLS[which]))
+            .setNegativeButton("Cancelar", null)
+            .show();
     }
 
     private void configureWebViewForMode(int mode) {
@@ -1227,15 +1366,14 @@ public class MainActivity extends Activity {
             "    } else if(!show){ shield.style.backgroundImage=''; }" +
             "  }" +
             "  if(sk){sk.click();return;}" +
-            // Fast-forward SOLO ante anuncio confirmado — nunca por un simple atasco.
-            "  if(adMarked){" +
-            "    var v=document.querySelector('video');" +
-            "    if(v&&v.duration>0&&!isNaN(v.duration)&&v.duration<600){" +
-            "      v.playbackRate=16;v.currentTime=v.duration-0.1;}" +
-            "  } else {" +
-            "    var v2=document.querySelector('video');" +
-            "    if(v2&&v2.playbackRate>1)v2.playbackRate=1;" +
-            "  }" +
+            // No more force-seeking through ads (used to set playbackRate=16 and jump
+            // currentTime to the end) — that's what was skipping real content when
+            // adMarked false-positived, and even when it correctly caught a real ad, the
+            // extreme-speed scrub rendered as a glitchy small box for an instant, which is
+            // worse than just letting the ad play normally. Skipping is still immediate
+            // whenever YouTube offers an actual skip button (sk, above) or an interstitial
+            // dismiss (below, YouTube TV) — those are real, intentional controls. Anything
+            // without one just plays at normal speed under the shield until it ends.
             // YouTube TV interstitial
             "  var ib=document.querySelector(" +
             "    '[data-dismiss-interstitial],ytlr-skip-button-renderer button," +
@@ -1419,6 +1557,7 @@ public class MainActivity extends Activity {
             public void onPageFinished(WebView view, String url) {
                 progressBar.setVisibility(View.GONE);
                 urlBar.setText(url);
+                updateFavoriteButton();
 
                 // Save to recents (title via JS)
                 view.evaluateJavascript("document.title", result -> {
@@ -1643,7 +1782,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.cardTor).setOnClickListener(v -> launchMode(NAV_INCOGNITO));
         findViewById(R.id.cardYtTv).setOnClickListener(v -> launchMode(NAV_YT_TV));
         findViewById(R.id.cardYtWeb).setOnClickListener(v -> launchMode(NAV_YT_WEB));
-        findViewById(R.id.cardMovies).setOnClickListener(v -> launchMode(NAV_MOVIES));
+        findViewById(R.id.cardMovies).setOnClickListener(v -> showMoviesDialog());
         findViewById(R.id.cardAnime).setOnClickListener(v -> launchMode(NAV_ANIME));
 
         findViewById(R.id.btnYoutube).setOnClickListener(v ->
