@@ -12,6 +12,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Default GITHUB_TOKEN permissions are read-only unless granted here — without this
+    # the "Create GitHub Release" step fails with "Resource not accessible by integration"
+    # (confirmed: that's exactly what happened on the first v2.1 tag push).
+    permissions:
+      contents: write
     # secrets.* can't be referenced directly in a step's `if:` (GitHub rejects the whole
     # workflow file for it) — route it through a job-level env var instead, which *can*
     # read secrets in its value.
