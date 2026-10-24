@@ -6,6 +6,11 @@ Fuentes:
   - uBlock Origin filters (YouTube-específico)
   - AdGuard Mobile Ads & Tracking
   - EasyPrivacy (dominios de tracking)
+  - HaGeZi Multi LIGHT — bloqueo general de anuncios/rastreadores (cualquier sitio,
+    no solo YouTube/Google; es la lista que convierte el bloqueo en la defensa
+    principal del navegador en vez de un extra solo para YouTube)
+  - HaGeZi Pop-Up Ads — redes de pop-ups/redirecciones (el tipo de anuncio que
+    saca de la app en sitios como Cuevana)
   - Lista manual en blocklist.txt (preservada siempre)
 
 Corre semanalmente vía GitHub Actions.
@@ -40,6 +45,20 @@ SOURCES = [
         "url": "https://easylist.to/easylist/easyprivacy.txt",
         "keywords": ["google-analytics", "doubleclick", "googlesyndication",
                      "googletagmanager", "scorecardresearch", "quantserve"],
+    },
+    # Sin filtro de palabras clave — estas dos ya vienen curadas para anuncios y
+    # rastreadores en general, no solo Google/YouTube. Son las que hacen que el
+    # bloqueo funcione en cualquier sitio (Cuevana, Brave Search, lo que sea),
+    # no solo dentro de los modos YouTube.
+    {
+        "name": "HaGeZi Multi LIGHT (anuncios/rastreadores general)",
+        "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt",
+        "keywords": None,
+    },
+    {
+        "name": "HaGeZi Pop-Up Ads",
+        "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/popupads.txt",
+        "keywords": None,
     },
 ]
 
@@ -86,7 +105,9 @@ def extract_hosts(content: str, keywords: list) -> set:
     return hosts
 
 
-def _relevant(host: str, keywords: list) -> bool:
+def _relevant(host: str, keywords) -> bool:
+    if not keywords:   # source already curated for ads/trackers — nothing to filter by
+        return True
     return any(kw in host for kw in keywords)
 
 
@@ -134,7 +155,7 @@ def write_blocklist(path: str, manual_hosts: set, manual_patterns: set,
         f.write("\n")
         f.write("# ════════════════════════════════════════════════════════════\n")
         f.write(f"# AUTO-GENERATED — {today} — no editar esta sección manualmente\n")
-        f.write(f"# Fuentes: uBlock Origin, AdGuard Mobile Ads, EasyPrivacy\n")
+        f.write(f"# Fuentes: uBlock Origin, AdGuard Mobile Ads, EasyPrivacy, HaGeZi Light, HaGeZi Pop-Up Ads\n")
         f.write("# ════════════════════════════════════════════════════════════\n")
 
         # Hosts automáticos (excluye los que ya están en la sección manual)
