@@ -24,6 +24,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -35,7 +39,11 @@ public class MainActivity extends Activity {
 
     private static final String BLOCKLIST_URL =
         "https://raw.githubusercontent.com/jdans01/BraveTV/main/blocklist.txt";
-    private static final String PREF_BLOCKLIST      = "remote_blocklist";
+    // Cached on disk, not in SharedPreferences — the list now includes a general-purpose
+    // ad/tracker list (HaGeZi Light + Pop-Up Ads, ~111k domains, ~2.7MB), and SharedPreferences
+    // is backed by a single XML file read/written as a whole; a blob that size has no business
+    // living there.
+    private static final String BLOCKLIST_FILE      = "blocklist_cache.txt";
     private static final String PREF_BLOCKLIST_TIME = "remote_blocklist_time";
     // Refresh every 6 hours
     private static final long   BLOCKLIST_TTL_MS    = 6 * 60 * 60 * 1000L;
@@ -57,11 +65,18 @@ public class MainActivity extends Activity {
     private Button btnVpn;
     private ScrollView homeScreen;
     private TextView homeVpnStatus;
+    private TextView homeQuality;
     private LinearLayout recentsList;
     private SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private boolean navBarHidden = false;
+    // Last time we saw a real tap/click from the user (D-pad OK, pointer click, or a
+    // gestured page navigation) — see shouldOverrideUrlLoading's redirect guard.
+    private volatile long lastGestureAtMs = 0;
+    private static final long GESTURE_GRACE_MS = 4000;
+    private View customView;
+    private WebChromeClient.CustomViewCallback customViewCallback;
     private int blockedCount = 0;
     private TextView btnBlockCount;
     private TextView homeBlockCount;
@@ -91,10 +106,60 @@ public class MainActivity extends Activity {
     private int switchCount = 0;
     private static final int MAX_SWITCHES = AUTO_REGIONS.length;
 
+    // ─── Calidad de video ──────────────────────────────────────────────────────
+    // Forcing the absolute highest available quality unconditionally (the old behavior)
+    // is what was choking playback on weaker/smaller TVs — the decoder has to work much
+    // harder for 4K than the screen can even resolve. QUALITY_* lets the user cap the
+    // ceiling to something their TV size can actually decode smoothly.
+    private static final String[] QUALITY_LEVELS = {"hd2160","hd1440","hd1080","hd720","large","medium"};
+    private static final String[] QUALITY_CAPS   = {"auto","hd1080","hd720","large"};
+    private static final String[] QUALITY_LABELS = {
+        "🤖 Automática (máxima calidad)",
+        "🖥️ TV grande 55\"+ — 1080p",
+        "📺 TV mediana 32\"–50\" — 720p",
+        "📱 TV chica <32\" — 480p"
+    };
+    private static final String[] QUALITY_SHORT = {"Auto", "1080p", "720p", "480p"};
+    private String videoQualityCap = "auto";
+
+    private String[] qualitiesForCap() {
+        if ("auto".equals(videoQualityCap)) return QUALITY_LEVELS;
+        for (int i = 0; i < QUALITY_LEVELS.length; i++)
+            if (QUALITY_LEVELS[i].equals(videoQualityCap))
+                return Arrays.copyOfRange(QUALITY_LEVELS, i, QUALITY_LEVELS.length);
+        return QUALITY_LEVELS;
+    }
+
+    private void updateHomeQualityLabel() {
+        if (homeQuality == null) return;
+        int idx = Arrays.asList(QUALITY_CAPS).indexOf(videoQualityCap);
+        homeQuality.setText("📺 Calidad: " + QUALITY_SHORT[idx >= 0 ? idx : 0]);
+    }
+
+    private void showQualityDialog() {
+        int current = Math.max(0, Arrays.asList(QUALITY_CAPS).indexOf(videoQualityCap));
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("Calidad de video — según el tamaño de tu TV")
+            .setSingleChoiceItems(QUALITY_LABELS, current, (d, which) -> {
+                videoQualityCap = QUALITY_CAPS[which];
+                prefs.edit().putString("videoQualityCap", videoQualityCap).apply();
+                updateHomeQualityLabel();
+                Toast.makeText(this, "📺 " + QUALITY_LABELS[which], Toast.LENGTH_SHORT).show();
+                d.dismiss();
+                if (webView.getVisibility() == View.VISIBLE) webView.reload();
+            })
+            .setNegativeButton("Cancelar", null)
+            .show();
+    }
+
     // ─── Ad block ─────────────────────────────────────────────────────────────
-    // Mutable sets — seeded from built-in list, overwritten by remote blocklist
-    private final Set<String> adHosts    = new HashSet<>();
-    private final Set<String> adPatterns = new HashSet<>();
+    // Seeded from the built-in list, replaced wholesale by the remote blocklist once it
+    // loads. volatile + whole-set swap (never mutated in place after publish) because
+    // isAdUrl() is read from shouldInterceptRequest's background thread while a fresh set
+    // can be published from bgExecutor at any time — this is the safe-publication pattern,
+    // not a synchronized block, since the published set itself is never touched again.
+    private volatile Set<String> adHosts    = new HashSet<>();
+    private volatile Set<String> adPatterns = new HashSet<>();
 
     private static final Set<String> AD_HOSTS = new HashSet<>(Arrays.asList(
         // Google ads / IMA SDK — bloquear IMA impide que el player cargue el anuncio de video
@@ -133,16 +198,35 @@ public class MainActivity extends Activity {
 
     // ── Seed mutable sets from built-in + cached remote list ─────────────────
     private void initBlocklist() {
-        adHosts.addAll(AD_HOSTS);
-        adPatterns.addAll(AD_URL_PATTERNS);
-        // Apply cached remote list immediately (no network wait)
-        String cached = prefs.getString(PREF_BLOCKLIST, "");
-        if (!cached.isEmpty()) applyRemoteBlocklist(cached);
-        // Fetch fresh copy in background if TTL expired
-        long lastFetch = prefs.getLong(PREF_BLOCKLIST_TIME, 0);
-        if (System.currentTimeMillis() - lastFetch > BLOCKLIST_TTL_MS) {
-            fetchRemoteBlocklist();
-        }
+        adHosts    = new HashSet<>(AD_HOSTS);
+        adPatterns = new HashSet<>(AD_URL_PATTERNS);
+        // Reading/parsing a ~2.7MB cached list has no business running on the UI thread
+        // during onCreate — do the whole cache-load + maybe-refetch sequence in the
+        // background and let applyRemoteBlocklist's set-swap publish the result whenever
+        // it's ready. The built-in set above already covers requests made before that.
+        bgExecutor.execute(() -> {
+            File cacheFile = new File(getFilesDir(), BLOCKLIST_FILE);
+            if (cacheFile.exists()) {
+                try {
+                    String cached = readFile(cacheFile);
+                    if (!cached.isEmpty()) applyRemoteBlocklist(cached);
+                } catch (Exception ignored) {}
+            }
+            long lastFetch = prefs.getLong(PREF_BLOCKLIST_TIME, 0);
+            if (System.currentTimeMillis() - lastFetch > BLOCKLIST_TTL_MS) {
+                fetchRemoteBlocklist();
+            }
+        });
+    }
+
+    private static String readFile(File f) throws Exception {
+        FileInputStream fis = new FileInputStream(f);
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        byte[] buf = new byte[16384];
+        int n;
+        while ((n = fis.read(buf)) != -1) bos.write(buf, 0, n);
+        fis.close();
+        return bos.toString("UTF-8");
     }
 
     private void fetchRemoteBlocklist() {
@@ -150,7 +234,8 @@ public class MainActivity extends Activity {
             try {
                 HttpURLConnection conn = (HttpURLConnection) new URL(BLOCKLIST_URL).openConnection();
                 conn.setConnectTimeout(8000);
-                conn.setReadTimeout(8000);
+                // A ~2.7MB list over a slow connection needs more than the old 8s budget.
+                conn.setReadTimeout(20000);
                 conn.setRequestProperty("User-Agent", "BraveTVBrowser/1.0");
                 if (conn.getResponseCode() != 200) return;
                 StringBuilder sb = new StringBuilder();
@@ -161,26 +246,30 @@ public class MainActivity extends Activity {
                 conn.disconnect();
                 String content = sb.toString().trim();
                 if (content.isEmpty()) return;
-                prefs.edit()
-                    .putString(PREF_BLOCKLIST, content)
-                    .putLong(PREF_BLOCKLIST_TIME, System.currentTimeMillis())
-                    .apply();
-                handler.post(() -> applyRemoteBlocklist(content));
+                FileOutputStream fos = new FileOutputStream(new File(getFilesDir(), BLOCKLIST_FILE));
+                fos.write(content.getBytes("UTF-8"));
+                fos.close();
+                prefs.edit().putLong(PREF_BLOCKLIST_TIME, System.currentTimeMillis()).apply();
+                applyRemoteBlocklist(content);
             } catch (Exception ignored) {}
         });
     }
 
+    // Always called from bgExecutor (cache-load path or post-download path) — builds the
+    // new sets off the UI thread, then publishes with a single volatile reference swap
+    // instead of clear()+addAll() into a live set, which at ~111k entries would otherwise
+    // be real main-thread work if called via handler.post like the old ~60-entry version did.
     private void applyRemoteBlocklist(String content) {
-        Set<String> hosts    = new HashSet<>();
-        Set<String> patterns = new HashSet<>();
+        Set<String> hosts    = new HashSet<>(AD_HOSTS);
+        Set<String> patterns = new HashSet<>(AD_URL_PATTERNS);
         for (String raw : content.split("\n")) {
             String line = raw.trim();
             if (line.isEmpty() || line.startsWith("#")) continue;
             if (line.startsWith("HOST:"))    hosts.add(line.substring(5).trim());
             else if (line.startsWith("PATTERN:")) patterns.add(line.substring(8).trim());
         }
-        if (!hosts.isEmpty())    { adHosts.clear();    adHosts.addAll(hosts); }
-        if (!patterns.isEmpty()) { adPatterns.clear(); adPatterns.addAll(patterns); }
+        if (hosts.size() > AD_HOSTS.size())             adHosts = hosts;
+        if (patterns.size() > AD_URL_PATTERNS.size())   adPatterns = patterns;
     }
 
     private boolean isAdUrl(String url) {
@@ -188,10 +277,16 @@ public class MainActivity extends Activity {
         try {
             Uri uri = Uri.parse(url);
             String host = uri.getHost();
-            if (host != null) {
-                if (adHosts.contains(host)) return true;
-                for (String h : adHosts)
-                    if (host.endsWith("." + h)) return true;
+            // Walk up the domain labels (a.b.example.com -> b.example.com -> example.com -> com)
+            // doing an O(1) HashSet lookup at each step, instead of the old approach of scanning
+            // every one of ~111k blocklist entries per request with host.endsWith("."+h) — that
+            // was fine at ~30 curated hosts, but would mean tens of millions of string
+            // comparisons per page once the list covers general ad/tracker domains.
+            Set<String> hosts = adHosts;
+            while (host != null) {
+                if (hosts.contains(host)) return true;
+                int dot = host.indexOf('.');
+                host = (dot >= 0 && dot + 1 < host.length()) ? host.substring(dot + 1) : null;
             }
             for (String p : adPatterns) if (url.contains(p)) return true;
         } catch (Exception ignored) {}
@@ -274,7 +369,16 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface
         public void onFullscreen(boolean full) {
-            handler.post(() -> setNavBarHidden(full));
+            handler.post(() -> {
+                // Entering fullscreen video while pointer mode is on is how control got lost:
+                // the cursor is easy to lose track of over a fullscreen video, D-pad stops
+                // reaching the navbar (pointer mode claims it unconditionally), and there was
+                // no obvious way back. A mouse pointer isn't useful while watching a video
+                // anyway, so just drop pointer mode on entering fullscreen instead of letting
+                // the user get stuck in it.
+                if (full && pointerMode) togglePointerMode();
+                setNavBarHidden(full);
+            });
         }
     }
 
@@ -460,6 +564,8 @@ public class MainActivity extends Activity {
         btnVpn        = findViewById(R.id.btnVpn);
         homeScreen    = findViewById(R.id.homeScreen);
         homeVpnStatus  = findViewById(R.id.homeVpnStatus);
+        homeQuality    = findViewById(R.id.homeQuality);
+        if (homeQuality != null) homeQuality.setOnClickListener(v -> showQualityDialog());
         recentsList    = findViewById(R.id.recentsList);
         btnBlockCount  = findViewById(R.id.btnBlockCount);
         homeBlockCount = findViewById(R.id.homeBlockCount);
@@ -474,6 +580,8 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences("bravetv", 0); // Context.MODE_PRIVATE = 0
         autoVpnEnabled = prefs.getBoolean("vpn", true);
         regionIndex    = prefs.getInt("regionIdx", 0);
+        videoQualityCap = prefs.getString("videoQualityCap", "auto");
+        updateHomeQualityLabel();
         initBlocklist(); // seed built-in + load cached remote list
 
         CookieManager.getInstance().setAcceptCookie(true);
@@ -511,9 +619,15 @@ public class MainActivity extends Activity {
         if (cursorDot == null) return;
         int w = webView.getWidth();
         int h = webView.getHeight();
+        float maxY = h - dp(32);
         // Clamp keeping arrow tip inside screen
         float cx = Math.max(0, Math.min(x, w - dp(28)));
-        float cy = Math.max(0, Math.min(y, h - dp(32)));
+        float cy = Math.max(0, Math.min(y, maxY));
+        // Requested position overshot the top/bottom edge — the cursor has nowhere further
+        // to go, so scroll the page instead of just stopping dead. Matches plain D-pad mode,
+        // which already scrolls on DPAD_DOWN once nothing more is focusable below.
+        if (y > maxY) webView.evaluateJavascript("window.scrollBy(0,220)", null);
+        else if (y < 0) webView.evaluateJavascript("window.scrollBy(0,-220)", null);
         cursor.set(cx, cy);
         cursorDot.setX(cx);
         cursorDot.setY(cy);
@@ -522,6 +636,7 @@ public class MainActivity extends Activity {
     }
 
     private void simulateClick(float x, float y) {
+        lastGestureAtMs = System.currentTimeMillis();
         long now = android.os.SystemClock.uptimeMillis();
         MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x, y, 0);
         MotionEvent up   = MotionEvent.obtain(now, now + 80, MotionEvent.ACTION_UP, x, y, 0);
@@ -660,6 +775,119 @@ public class MainActivity extends Activity {
         CookieManager.getInstance().flush();
     }
 
+    // ─── YouTube ad-data stripping (JSON.parse patch, à la TizenTube) ────────
+    // injectAdBlocker's CSS/skip-loop hides or fast-forwards an ad *after* YouTube's
+    // player has already been told one exists — which is why a gray placeholder frame
+    // shows up for the brief moment before our JS catches up. YouTube TV/Web decide
+    // whether to show an ad entirely from fields (adPlacements/playerAds/adSlots) inside
+    // the JSON responses their own code parses. Stripping those fields before the
+    // player ever reads them means it never schedules an ad in the first place — no
+    // placeholder to paper over. Called from onPageStarted (as early as this WebView
+    // can inject) instead of onPageFinished so the patch is in place before YouTube's
+    // bootstrap script runs its first JSON.parse; only scoped to YouTube modes since
+    // blanket-patching JSON.parse on arbitrary sites is unnecessary risk for no benefit.
+    private void injectYouTubeAdDataBlock(WebView view) {
+        view.evaluateJavascript(
+            "(function(){" +
+            "if(window._btvJsonAdBlock) return; window._btvJsonAdBlock=true;" +
+            "var _origParse=JSON.parse;" +
+            "JSON.parse=function(){" +
+            "  var r=_origParse.apply(this,arguments);" +
+            "  try{" +
+            "    if(r&&typeof r==='object'){" +
+            "      if(r.adPlacements) r.adPlacements=[];" +
+            "      if(r.playerAds) r.playerAds=false;" +
+            "      if(r.adSlots) r.adSlots=[];" +
+            "      var ov=r.playerOverlays&&r.playerOverlays.playerOverlayRenderer;" +
+            "      if(ov&&ov.timelyActionRenderers){" +
+            "        ov.timelyActionRenderers=ov.timelyActionRenderers.filter(function(a){" +
+            "          var ty=a&&a.timelyActionRenderer&&a.timelyActionRenderer.type;" +
+            "          return ty!=='TIMELY_ACTION_TYPE_SHOPPING';" +
+            "        });" +
+            "      }" +
+            "    }" +
+            "  }catch(e){}" +
+            "  return r;" +
+            "};" +
+            "window.JSON.parse=JSON.parse;" +
+            // YouTube TV's sandboxed app namespace(s) keep their own JSON reference —
+            // patch those too or parsing inside the TV UI shell bypasses the above.
+            "if(window._yttv){for(var k in window._yttv){" +
+            "  if(window._yttv[k]&&window._yttv[k].JSON&&window._yttv[k].JSON.parse)" +
+            "    window._yttv[k].JSON.parse=JSON.parse;" +
+            "}}" +
+            "})()", null);
+    }
+
+    // ─── Escudo visual: crea el DOM/CSS una sola vez por documento ───────────
+    // Separado de injectAdBlocker (que corre en onPageFinished, ya tarde) para poder
+    // llamarlo también desde onPageStarted — necesita existir ANTES de que la propia
+    // pantalla de carga nativa de YouTube aparezca, no después.
+    private void ensureShieldDom(WebView view) {
+        view.evaluateJavascript(
+            "(function(){" +
+            "if(document.getElementById('_btv_shield')) return;" +
+            "var s=document.createElement('style');s.id='_btv_shield_css';" +
+            "s.textContent=" +
+            "'@keyframes btvPulse{0%{transform:scale(1);opacity:.55}" +
+            "50%{transform:scale(1.18);opacity:.95}100%{transform:scale(1);opacity:.55}}" +
+            ".btv-shield{position:fixed;inset:0;z-index:2147483647;display:none;" +
+            "align-items:center;justify-content:center;flex-direction:column;gap:14px;" +
+            "background-color:#0b0714;" +
+            // Default (no thumbnail yet): purple gradient. When a poster/thumbnail is
+            // available the tick handler overwrites background-image inline with it plus a
+            // dark gradient layered on top — set as a plain background-image, not a filter,
+            // so it can't blur/darken the .ring/.msg children along with it.
+            "background-image:radial-gradient(circle at 50% 45%,#1a1033 0%,#0b0714 70%);" +
+            "background-size:cover;background-position:center;" +
+            "font-family:sans-serif;pointer-events:none}" +
+            ".btv-shield.on{display:flex}" +
+            ".btv-shield .ring{width:64px;height:64px;border-radius:50%;" +
+            "background:radial-gradient(circle,rgba(192,132,252,0.35),transparent 70%);" +
+            "animation:btvPulse 1.1s ease-in-out infinite;" +
+            "display:flex;align-items:center;justify-content:center;font-size:30px}" +
+            ".btv-shield .msg{font-size:15px;letter-spacing:.3px;color:#fff;" +
+            "text-shadow:0 1px 6px rgba(0,0,0,0.8)}';" +
+            "document.head.appendChild(s);" +
+            "var d=document.createElement('div');d.id='_btv_shield';d.className='btv-shield';" +
+            "d.innerHTML='<div class=\"ring\">🛡️</div>" +
+            "<div class=\"msg\" id=\"_btv_shield_msg\">Anuncio bloqueado</div>';" +
+            "document.documentElement.appendChild(d);})()", null);
+    }
+
+    // Extracts an 11-char YouTube video ID from a watch URL — v= query param (web,
+    // /watch?v=... and TV's #/watch?v=...) or the youtu.be/<id> path form.
+    private static String extractYouTubeVideoId(String url) {
+        if (url == null) return null;
+        try {
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("(?:[?&]v=|youtu\\.be/)([A-Za-z0-9_-]{11})")
+                .matcher(url);
+            return m.find() ? m.group(1) : null;
+        } catch (Exception e) { return null; }
+    }
+
+    // Shows the shield immediately with the video's thumbnail, covering the native
+    // loading screen from the very start of navigation instead of only reacting once
+    // already-stuck. _btvPendingPlay clears itself once Capa 2's loop sees real playback
+    // start, or after a 15s safety timeout so a genuinely broken video never gets stuck
+    // hidden behind the shield forever.
+    private void showShieldForVideo(WebView view, String url) {
+        String videoId = extractYouTubeVideoId(url);
+        if (videoId == null) return;
+        ensureShieldDom(view);
+        view.evaluateJavascript(
+            "(function(){" +
+            "var sh=document.getElementById('_btv_shield');if(!sh)return;" +
+            "sh.classList.add('on');" +
+            "sh.style.backgroundImage='linear-gradient(rgba(8,4,16,.6),rgba(8,4,16,.8))," +
+            "url(\"https://i.ytimg.com/vi/" + videoId + "/hqdefault.jpg\")';" +
+            "var m=document.getElementById('_btv_shield_msg');" +
+            "if(m)m.textContent='Cargando\\u2026';" +
+            "window._btvPendingPlay=true;window._btvPendingPlayAt=Date.now();" +
+            "})()", null);
+    }
+
     // ─── Ad blocker injection (called on page load AND on SPA navigation) ────
     private void injectAdBlocker(WebView view) {
         // ── Capa 1: CSS — oculta contenedores de anuncios ────────────────────
@@ -704,11 +932,23 @@ public class MainActivity extends Activity {
             "'.ytlr-companion-slot'," +
             "'ytlr-mealbar-promo-renderer'," +
             "'ytlr-skip-button-renderer'," +
-            // Generic
-            "'[id^=\"ad_\"]','[class*=\"-ad-\"]'" +
+            // Generic (YouTube or not) — deliberately narrow patterns only: "-ad-"/"ad-"
+            // requires the hyphen boundary so it doesn't catch ordinary words that merely
+            // contain "ad" (header, load, read…), and the rest are standard, named
+            // conventions (Google Publisher Tag's div-gpt-ad-*, AdSense's ins.adsbygoogle,
+            // known ad-iframe hosts) rather than guesses.
+            "'[id^=\"ad_\"]','[class*=\"-ad-\"]','[id*=\"-ad-\"]'," +
+            "'[class^=\"ad-\"]','[id^=\"ad-\"]','[id^=\"div-gpt-ad\"]'," +
+            "'ins.adsbygoogle','iframe[src*=\"doubleclick.net\"]'," +
+            "'iframe[src*=\"googlesyndication.com\"]'" +
             "].join(',')+" +
             "'{display:none!important;visibility:hidden!important;max-height:0!important}';" +
             "document.head.appendChild(s);})()", null);
+
+        // ── Capa 1b: escudo visual — tapa el placeholder gris nativo del
+        // reproductor mientras se detecta/salta un anuncio, en vez de dejarlo
+        // asomar durante el fast-forward.
+        ensureShieldDom(view);
 
         // ── Capa 2: JS — skip/fast-forward anuncios de video ─────────────────
         view.evaluateJavascript(
@@ -734,16 +974,56 @@ public class MainActivity extends Activity {
             "  if(this._blocked){this.abort();return;}" +
             "  return _oSend.apply(this,arguments);};" +
             // Loop: skip botón, fast-forward, dismiss interstitial
+            "var _btvStallTicks=0,_btvLastTime=-1;" +
             "setInterval(function(){" +
             "  var sk=document.querySelector(" +
             "    '.ytp-ad-skip-button,.ytp-skip-ad-button,.ytp-ad-skip-button-modern," +
             "     .ytp-ad-skip-button-slot button,ytlr-skip-button-renderer button," +
             "     button[class*=\"skip\"]');" +
+            // adMarked = an explicit ad signal (skip button present, or a known ad-container
+            // class on screen) — the ONLY thing allowed to fast-forward/seek the video below.
+            "  var adMarked=!!sk||!!document.querySelector(" +
+            "    '.ad-showing,.ad-interrupting,.ytp-ad-player-overlay,ytlr-ad-placement-renderer');" +
+            // stalled = the player looks stuck (not paused, no progress, not enough buffer) for
+            // several seconds straight — covers the case where a blocked ad request leaves
+            // YouTube waiting on a response that'll never come, showing its spinner over gray.
+            // Cosmetic ONLY: a plain network hiccup during real content looks identical for the
+            // first second or two, and earlier this ran on a 400ms trigger that force-seeked
+            // ANY brief buffering straight to the end of the video — i.e. it was skipping
+            // real playback, not just ads. A much longer threshold (~3s) and never touching
+            // playbackRate/currentTime for this case is what keeps it cosmetic-only.
+            "  var vs=document.querySelector('video');" +
+            "  var stalled=false;" +
+            "  if(vs&&!vs.paused&&vs.readyState<3){" +
+            "    if(vs.currentTime===_btvLastTime){_btvStallTicks++;}" +
+            "    else{_btvStallTicks=0;_btvLastTime=vs.currentTime;}" +
+            "    stalled=_btvStallTicks>=15;" +
+            "  }else{_btvStallTicks=0;_btvLastTime=vs?vs.currentTime:-1;}" +
+            // _btvPendingPlay: set by showShieldForVideo() the moment navigation to a video
+            // starts, so the shield (with that video's thumbnail) is already up before
+            // YouTube's own loading screen would be — clears once playback actually begins,
+            // or after 15s regardless so a genuinely broken video doesn't hide behind it.
+            "  if(window._btvPendingPlay){" +
+            "    var playing=vs&&vs.currentTime>0.3&&!vs.paused&&vs.readyState>=3;" +
+            "    if(playing||Date.now()-window._btvPendingPlayAt>15000)window._btvPendingPlay=false;" +
+            "  }" +
+            "  var show=adMarked||stalled||!!window._btvPendingPlay;" +
+            // Escudo visible mientras dure el anuncio/atasco — se chequea antes de cualquier
+            // 'return' de abajo para que no parpadee. Usa la miniatura del propio video
+            // (atributo poster, el que ya pone YouTube) en vez del fondo genérico cuando la
+            // tiene, para que se vea como 'cargando' en vez de una pantalla gris sin contexto.
+            "  var shield=document.getElementById('_btv_shield');" +
+            "  if(shield){" +
+            "    shield.classList.toggle('on',show);" +
+            "    var msgEl=document.getElementById('_btv_shield_msg');" +
+            "    if(show&&vs&&vs.poster){" +
+            "      shield.style.backgroundImage='linear-gradient(rgba(8,4,16,.6),rgba(8,4,16,.8)),url(\"'+vs.poster+'\")';" +
+            "      if(msgEl)msgEl.textContent=adMarked?'Anuncio bloqueado':'Cargando\\u2026';" +
+            "    } else if(!show){ shield.style.backgroundImage=''; }" +
+            "  }" +
             "  if(sk){sk.click();return;}" +
-            // Fast-forward si hay anuncio de video
-            "  var adOn=document.querySelector(" +
-            "    '.ad-showing,.ad-interrupting,.ytp-ad-player-overlay');" +
-            "  if(adOn){" +
+            // Fast-forward SOLO ante anuncio confirmado — nunca por un simple atasco.
+            "  if(adMarked){" +
             "    var v=document.querySelector('video');" +
             "    if(v&&v.duration>0&&!isNaN(v.duration)&&v.duration<600){" +
             "      v.playbackRate=16;v.currentTime=v.duration-0.1;}" +
@@ -760,6 +1040,28 @@ public class MainActivity extends Activity {
             "  var ad=document.querySelector('.ytp-ad-player-overlay,.ytp-ad-module');" +
             "  if(ad&&ad.parentNode)ad.parentNode.removeChild(ad);" +
             "},200);})()", null);
+
+        // ── Capa 3: botones genéricos de "saltar anuncio" fuera de YouTube ────
+        // Cada sitio hace su propia pantalla de "anuncio bloqueado"/interstitial de forma
+        // distinta, así que esto es necesariamente heurístico — busca SOLO frases que de
+        // verdad signifiquen "saltar anuncio" (no "cerrar"/"continuar" genéricos, que
+        // aparecen en banners de cookies, modales y demás UI real y terminarían clickeados
+        // por error) para mantener el riesgo de falso positivo bajo.
+        view.evaluateJavascript(
+            "(function(){" +
+            "if(window._btvGenSkip) return; window._btvGenSkip=true;" +
+            "var RE=/^(skip ?ad[s]?|saltar anuncio|omitir anuncio|cerrar anuncio|" +
+            "pular an[uú]ncio|close ?ad[s]?)$/i;" +
+            "setInterval(function(){" +
+            "  var els=document.querySelectorAll('button,a,[role=\"button\"],[onclick]');" +
+            "  for(var i=0;i<els.length;i++){" +
+            "    var t=(els[i].textContent||'').trim();" +
+            "    if(!t||!RE.test(t))continue;" +
+            "    var r=els[i].getBoundingClientRect();" +
+            "    if(r.width>0&&r.height>0){els[i].click();break;}" +
+            "  }" +
+            "},1000);" +
+            "})()", null);
     }
 
     // ─── D-pad spatial navigation injection ──────────────────────────────────
@@ -784,11 +1086,21 @@ public class MainActivity extends Activity {
             "select:not([disabled]),[tabindex]:not([tabindex=\"-1\"])," +
             "[role=\"button\"],[role=\"link\"],[role=\"menuitem\"]';" +
 
+            // A card whose poster/thumbnail hasn't loaded yet (lazy-loaded <img>, common on
+            // search/catalog pages) collapses its wrapping link to a 0x0 rect until the image
+            // arrives — requiring width>0&&height>0 silently dropped every result without an
+            // already-loaded image from the focusable set, matching 'only picks results with a
+            // picture'. Keep zero-size elements as long as they're actually laid out (not
+            // display:none / detached), and only drop genuinely hidden ones.
+            "function visible(e){" +
+            "  var r=e.getBoundingClientRect();" +
+            "  if(r.top>=window.innerHeight||r.bottom<=0) return false;" +
+            "  if(r.width===0&&r.height===0&&e.offsetParent===null) return false;" +
+            "  var cs=getComputedStyle(e);" +
+            "  return cs.visibility!=='hidden'&&cs.display!=='none';" +
+            "}" +
             "function getEls(){" +
-            "  return Array.from(document.querySelectorAll(SEL)).filter(function(e){" +
-            "    var r=e.getBoundingClientRect();" +
-            "    return r.width>0&&r.height>0&&r.top<window.innerHeight&&r.bottom>0;" +
-            "  });" +
+            "  return Array.from(document.querySelectorAll(SEL)).filter(visible);" +
             "}" +
 
             "function nearest(cur,dir){" +
@@ -888,6 +1200,14 @@ public class MainActivity extends Activity {
                 progressBar.setVisibility(View.VISIBLE);
                 progressBar.setProgress(0);
                 urlBar.setText(url);
+                if (currentMode == NAV_YT_TV || currentMode == NAV_YT_WEB) {
+                    injectYouTubeAdDataBlock(view);
+                    // Cover with the video's own thumbnail from the first moment of
+                    // navigation — otherwise YouTube's native loading screen shows gray
+                    // and unbranded for however long it takes before anything else here
+                    // would notice and react.
+                    showShieldForVideo(view, url);
+                }
             }
 
             @Override
@@ -906,25 +1226,41 @@ public class MainActivity extends Activity {
                 injectAdBlocker(view);
                 injectDpadNavigation(view);
 
-                // Force highest available video quality (1080p → 4K)
+                // Cap video quality at (at most) the user's chosen ceiling — see
+                // "📺 Calidad" on the home screen. Forcing the absolute highest quality
+                // unconditionally (the old behavior, hardcoded to a floor of 1080p) is what
+                // made playback choppy on a smaller/weaker TV: the decoder works far harder
+                // for 4K than a 32"-50" screen can even resolve, and a hard floor meant
+                // adaptive streaming could never drop down when the network or decoder
+                // genuinely couldn't keep up. 'tiny' as the floor here lets it actually adapt;
+                // only the ceiling is capped.
                 // Unguarded before: onPageFinished can fire more than once for the same page
                 // (redirects, iframes), and every extra firing stacked another setInterval that
                 // ran forever — the likely cause of the app getting slower the longer it's used.
                 // injectAdBlocker's own loop and injectDpadNavigation already guard themselves
                 // (window._btvSkip2 / window._btvNav); this one and the two below didn't.
+                String[] qCaps = qualitiesForCap();
+                StringBuilder qb = new StringBuilder("[");
+                for (int qi = 0; qi < qCaps.length; qi++) {
+                    if (qi > 0) qb.append(',');
+                    qb.append('\'').append(qCaps[qi]).append('\'');
+                }
+                qb.append(']');
+                String qualitiesJs = qb.toString();
+                String maxQ = qCaps[0];
                 view.evaluateJavascript(
                     "(function(){" +
                     "if(window._btvHD) return; window._btvHD=true;" +
-                    "var QUALITIES=['hd2160','hd1440','hd1080','hd720'];" +
+                    "var QUALITIES=" + qualitiesJs + ";" +
                     "function forceHD(){" +
                     // Standard YouTube web player
                     "  var p=document.getElementById('movie_player');" +
                     "  if(p){" +
-                    "    try{if(p.setPlaybackQualityRange)p.setPlaybackQualityRange('hd1080','hd2160');}catch(e){}" +
-                    "    try{if(p.setPlaybackQuality)p.setPlaybackQuality('hd1080');}catch(e){}" +
+                    "    try{if(p.setPlaybackQualityRange)p.setPlaybackQualityRange('tiny','" + maxQ + "');}catch(e){}" +
                     "    try{" +
                     "      var avail=p.getAvailableQualityLevels&&p.getAvailableQualityLevels();" +
-                    "      if(avail&&avail.length>0){" +
+                    "      var cur=p.getPlaybackQuality&&p.getPlaybackQuality();" +
+                    "      if(avail&&avail.length>0&&QUALITIES.indexOf(cur)<0){" +
                     "        for(var q=0;q<QUALITIES.length;q++){" +
                     "          if(avail.indexOf(QUALITIES[q])>=0){" +
                     "            p.setPlaybackQuality(QUALITIES[q]);break;}" +
@@ -937,7 +1273,7 @@ public class MainActivity extends Activity {
                     "    var yta=document.querySelector('ytlr-app')||document.querySelector('yt-app');" +
                     "    if(yta&&window.yt&&window.yt.player){" +
                     "      var pp=window.yt.player.Application.get();" +
-                    "      if(pp&&pp.setPlaybackQualityRange)pp.setPlaybackQualityRange('hd1080','hd2160');" +
+                    "      if(pp&&pp.setPlaybackQualityRange)pp.setPlaybackQualityRange('tiny','" + maxQ + "');" +
                     "    }" +
                     "  }catch(e){}" +
                     "}" +
@@ -997,7 +1333,54 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
                 String url = req.getUrl().toString();
+                String scheme = req.getUrl().getScheme();
+                // Ad-heavy sites (Cuevana and similar) routinely redirect through non-http
+                // schemes — intent://, market://, whatsapp://, tel:... — for apps this TV
+                // doesn't have installed. Handing those to WebView.loadUrl() lets it try to
+                // resolve the Intent itself and throw ActivityNotFoundException with nothing on
+                // the call stack to catch it, which kills the whole app (reported as "me saca
+                // de la aplicación"). Resolve and launch ourselves; swallow anything that fails.
+                if (scheme != null && !scheme.equals("http") && !scheme.equals("https")) {
+                    try {
+                        android.content.Intent intent = android.content.Intent.parseUri(
+                            url, android.content.Intent.URI_INTENT_SCHEME);
+                        intent.addCategory(android.content.Intent.CATEGORY_BROWSABLE);
+                        intent.setComponent(null);
+                        intent.setSelector(null);
+                        if (intent.resolveActivity(getPackageManager()) != null) startActivity(intent);
+                    } catch (Exception ignored) {}
+                    return true;
+                }
+                if (req.hasGesture()) lastGestureAtMs = System.currentTimeMillis();
+                // Redirect/popunder ads (Cuevana and the like) hijack navigation to a totally
+                // different domain — a timer, an onload handler, a transparent overlay that
+                // "catches" the next touch. Two separate signals, not one blanket rule:
+                //  1) the target is a KNOWN ad host (same blocklist resources already use) —
+                //     always block it, full stop, timing doesn't matter.
+                //  2) otherwise, only block if there's been no real tap (D-pad OK, pointer
+                //     click, or a gestured nav) in the last few seconds. A flat "block anything
+                //     without hasGesture() on THIS exact hop" was too strict: these sites chain
+                //     through async redirects (a timer, an XHR lookup) after a real click before
+                //     landing on the actual video, and Chromium's own gesture flag doesn't
+                //     survive that async gap even though the click was genuine — that blocked
+                //     the real content along with the ads. The grace window tells those apart.
+                String curHost = null, newHost = null;
+                try { curHost = Uri.parse(view.getUrl()).getHost(); } catch (Exception ignored) {}
+                try { newHost = req.getUrl().getHost(); } catch (Exception ignored) {}
+                boolean crossDomain = curHost != null && newHost != null
+                    && !curHost.equalsIgnoreCase(newHost)
+                    && !newHost.endsWith("." + curHost) && !curHost.endsWith("." + newHost);
+                boolean recentGesture = req.hasGesture()
+                    || (System.currentTimeMillis() - lastGestureAtMs) <= GESTURE_GRACE_MS;
+                if (isAdUrl(url) || (crossDomain && !recentGesture)) {
+                    Toast.makeText(MainActivity.this, "🛡 Redirección bloqueada", Toast.LENGTH_SHORT).show();
+                    return true;
+                }
                 view.loadUrl(currentMode != NAV_INCOGNITO ? applyRegion(url) : url);
+                // SPA navigation to a new video (YouTube TV switches without a full page
+                // load) — onPageStarted won't fire for this, so prime the shield here too.
+                if (currentMode == NAV_YT_TV || currentMode == NAV_YT_WEB)
+                    showShieldForVideo(view, url);
                 // Re-inject ad blocker after SPA navigation (YouTube TV doesn't fire onPageFinished)
                 handler.postDelayed(() -> { injectAdBlocker(view); injectDpadNavigation(view); }, 1200);
                 return true;
@@ -1010,11 +1393,25 @@ public class MainActivity extends Activity {
 
             @Override
             public void onShowCustomView(View view, CustomViewCallback cb) {
+                customView = view;
+                customViewCallback = cb;
                 navBar.setVisibility(View.GONE);
                 webView.setVisibility(View.GONE);
+                // Same reasoning as BraveTVInterface.onFullscreen(): pointer mode doesn't help
+                // while watching video and is how control got lost before — drop it outright
+                // rather than just hiding the dot, which left it stranded with nothing able to
+                // move it (pointer mode only reacts while webView is VISIBLE, which just
+                // became false) or turn it back on.
+                if (pointerMode) togglePointerMode();
                 LinearLayout c = findViewById(R.id.fullscreenContainer);
                 c.addView(view);
                 c.setVisibility(View.VISIBLE);
+                // Native fullscreen views (YouTube's own player, etc.) generally handle D-pad
+                // play/pause/seek themselves once focused — but only if something actually
+                // hands them Android focus, which nothing does by default here.
+                view.setFocusable(true);
+                view.setFocusableInTouchMode(true);
+                view.requestFocus();
             }
 
             @Override
@@ -1026,6 +1423,8 @@ public class MainActivity extends Activity {
                 navBar.setVisibility(View.VISIBLE);
                 navBarHidden = false;
                 navBar.setTranslationY(0);
+                customView = null;
+                customViewCallback = null;
             }
         });
 
@@ -1163,6 +1562,33 @@ public class MainActivity extends Activity {
         // ahead of everything, sees every key reliably.
         if (event.getAction() == KeyEvent.ACTION_DOWN) scheduleAutoHide();
 
+        // Pointer mode must own every D-pad key itself, before anything below gets a chance at
+        // it. Two different things were stealing it: (1) whatever View still held Android focus
+        // right after the OK press that turned pointer mode on — usually the cursor-toggle
+        // button itself — would eat the *next* OK as its own click (i.e. toggling pointer back
+        // off) once this method fell through to super.dispatchKeyEvent(), since that hands the
+        // event to the focused View first; (2) the "reveal hidden navbar on any key" branch right
+        // below this one, which swallowed OK whenever the navbar had auto-hidden. Both are fixed
+        // by handling the click/move here, unconditionally, before either path runs.
+        if (event.getAction() == KeyEvent.ACTION_DOWN && pointerMode
+                && webView.getVisibility() == View.VISIBLE) {
+            switch (event.getKeyCode()) {
+                case KeyEvent.KEYCODE_DPAD_UP:
+                    moveCursorTo(cursor.x, cursor.y - CURSOR_STEP); return true;
+                case KeyEvent.KEYCODE_DPAD_DOWN:
+                    moveCursorTo(cursor.x, cursor.y + CURSOR_STEP); return true;
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                    moveCursorTo(cursor.x - CURSOR_STEP, cursor.y); return true;
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                    moveCursorTo(cursor.x + CURSOR_STEP, cursor.y); return true;
+                case KeyEvent.KEYCODE_DPAD_CENTER:
+                case KeyEvent.KEYCODE_ENTER:
+                    if (navBarHidden) setNavBarHidden(false);
+                    simulateClick(cursor.x, cursor.y);
+                    return true;
+            }
+        }
+
         // Same bypass, same fix: reveal-on-any-key used to live in onKeyDown too, so e.g. DOWN
         // never revealed the bar — it went straight into the page (WebView's native scroll, or
         // page-internal focus shift) and onKeyDown never ran. Catch it here instead, for every
@@ -1193,6 +1619,21 @@ public class MainActivity extends Activity {
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
+            // Native fullscreen video (onShowCustomView) replaces the WebView with its own
+            // view and nothing else routes BACK to exiting it — without this the remote has
+            // no way out of fullscreen at all once a video is playing full-screen.
+            if (customViewCallback != null) {
+                customViewCallback.onCustomViewHidden();
+                return true;
+            }
+            // Universal escape hatch: whatever state pointer mode leaves things in — cursor
+            // obscured, navbar unreachable because pointer mode claims every D-pad key — BACK
+            // always gets you out of it first, consuming this press rather than doing its
+            // normal page-back/home job. A second BACK does that normally.
+            if (pointerMode) {
+                togglePointerMode();
+                return true;
+            }
             if (homeScreen.getVisibility() == View.VISIBLE) {
                 finish();
                 return true;
@@ -1213,22 +1654,8 @@ public class MainActivity extends Activity {
             if (homeScreen.getVisibility() == View.GONE) showSearchDialog();
             return true;
         }
-        // Pointer mode: D-pad moves cursor, OK simulates click
-        if (pointerMode && webView.getVisibility() == View.VISIBLE) {
-            switch (keyCode) {
-                case KeyEvent.KEYCODE_DPAD_UP:
-                    moveCursorTo(cursor.x, cursor.y - CURSOR_STEP); return true;
-                case KeyEvent.KEYCODE_DPAD_DOWN:
-                    moveCursorTo(cursor.x, cursor.y + CURSOR_STEP); return true;
-                case KeyEvent.KEYCODE_DPAD_LEFT:
-                    moveCursorTo(cursor.x - CURSOR_STEP, cursor.y); return true;
-                case KeyEvent.KEYCODE_DPAD_RIGHT:
-                    moveCursorTo(cursor.x + CURSOR_STEP, cursor.y); return true;
-                case KeyEvent.KEYCODE_DPAD_CENTER:
-                case KeyEvent.KEYCODE_ENTER:
-                    simulateClick(cursor.x, cursor.y); return true;
-            }
-        }
+        // Pointer mode is handled entirely in dispatchKeyEvent() now — see the comment there for
+        // why it has to be caught ahead of this method.
         // Only intercept D-pad when WebView has focus AND navbar is hidden.
         // If navbar is visible, let super handle it so Android moves focus between buttons.
         if (!pointerMode && webView.getVisibility() == View.VISIBLE && webView.hasFocus()) {
@@ -1257,6 +1684,7 @@ public class MainActivity extends Activity {
                 return true;
             }
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                lastGestureAtMs = System.currentTimeMillis();
                 webView.evaluateJavascript(
                     "(function(){var el=document.activeElement;" +
                     "if(el&&el!==document.body){el.click();}else{" +
