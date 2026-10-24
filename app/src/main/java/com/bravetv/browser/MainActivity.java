@@ -186,12 +186,15 @@ public class MainActivity extends Activity {
     private boolean isAdUrl(String url) {
         if (url == null) return false;
         try {
-            Uri uri = Uri.parse(url);
-            String host = uri.getHost();
+            String host = Uri.parse(url).getHost();
             if (host != null) {
                 if (adHosts.contains(host)) return true;
-                for (String h : adHosts)
-                    if (host.endsWith("." + h)) return true;
+                // Check subdomain: "sub.doubleclick.net" → find "doubleclick.net"
+                int dot = host.indexOf('.');
+                while (dot >= 0) {
+                    if (adHosts.contains(host.substring(dot + 1))) return true;
+                    dot = host.indexOf('.', dot + 1);
+                }
             }
             for (String p : adPatterns) if (url.contains(p)) return true;
         } catch (Exception ignored) {}
@@ -650,7 +653,8 @@ public class MainActivity extends Activity {
         view.evaluateJavascript(
             "(function(){" +
             "var ID='_btv_css2';" +
-            "var ex=document.getElementById(ID);if(ex)ex.remove();" +
+            // Skip if already present (SPA navigation keeps the DOM)
+            "if(document.getElementById(ID))return;" +
             "var s=document.createElement('style');s.id=ID;" +
             "s.textContent=[" +
             // YouTube web — anuncios en resultados y sidebar
@@ -743,7 +747,7 @@ public class MainActivity extends Activity {
             // Remove ad overlay nodes that CSS didn't catch
             "  var ad=document.querySelector('.ytp-ad-player-overlay,.ytp-ad-module');" +
             "  if(ad&&ad.parentNode)ad.parentNode.removeChild(ad);" +
-            "},200);})()", null);
+            "},500);})()", null);
     }
 
     // ─── D-pad spatial navigation injection ──────────────────────────────────
@@ -825,17 +829,22 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
-        s.setAllowFileAccess(true);
-        s.setAllowContentAccess(true);
-        s.setCacheMode(WebSettings.LOAD_DEFAULT);
+        s.setAllowFileAccess(false);
+        s.setAllowContentAccess(false);
+        // Cache aggressively — YouTube assets rarely change
+        s.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+        // Disable unused features to reduce overhead
+        s.setGeolocationEnabled(false);
+        s.setSaveFormData(false);
+        s.setSavePassword(false);
+        s.setBuiltInZoomControls(false);
+        s.setDisplayZoomControls(false);
         // Desktop Chrome UA → YouTube serves 1080p/4K instead of capping at 720p
         s.setUserAgentString(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
-        // Hint VP9/AV1 support for HD streams
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-        }
+        // Hardware acceleration for video decoding
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 
         webView.addJavascriptInterface(new BraveTVInterface(), "BraveTV");
 
@@ -844,14 +853,18 @@ public class MainActivity extends Activity {
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
                 if (isAdUrl(req.getUrl().toString())) {
                     blockedCount++;
-                    handler.post(() -> {
-                        if (btnBlockCount != null)
-                            btnBlockCount.setText("🚫 " + blockedCount);
-                        if (homeBlockCount != null)
-                            homeBlockCount.setText("🚫 " + blockedCount + " bloqueados");
-                    });
+                    // Throttle UI updates: only refresh counter every 5 blocks
+                    if (blockedCount % 5 == 0) {
+                        final int count = blockedCount;
+                        handler.post(() -> {
+                            if (btnBlockCount != null)
+                                btnBlockCount.setText("🚫 " + count);
+                            if (homeBlockCount != null)
+                                homeBlockCount.setText("🚫 " + count + " bloqueados");
+                        });
+                    }
                     return new WebResourceResponse("text/plain", "utf-8",
-                        new java.io.ByteArrayInputStream("".getBytes()));
+                        new java.io.ByteArrayInputStream(new byte[0]));
                 }
                 return super.shouldInterceptRequest(view, req);
             }
@@ -920,7 +933,7 @@ public class MainActivity extends Activity {
                     "  }catch(e){}" +
                     "}" +
                     "forceHD();" +
-                    "setInterval(forceHD,4000);" +
+                    "setInterval(forceHD,8000);" +
                     "})()", null);
 
                 // Region cookie
@@ -945,7 +958,7 @@ public class MainActivity extends Activity {
                         "if(typeof BraveTV!=='undefined')BraveTV.onGeoBlock(t.substring(0,80));return;}}}}" +
                         "var v=document.querySelector('video');" +
                         "if(v&&v.currentTime>3&&!v.paused&&typeof BraveTV!=='undefined')BraveTV.onVideoOk();}" +
-                        "setInterval(check,3000);})()", null);
+                        "setInterval(check,5000);})()", null);
                 }
 
                 // Fullscreen / auto-hide navbar — covers YouTube web + YouTube TV
@@ -965,15 +978,15 @@ public class MainActivity extends Activity {
                     "  var fs=isFS();" +
                     "  if(fs!==_fs){_fs=fs;" +
                     "    if(typeof BraveTV!=='undefined')BraveTV.onFullscreen(fs);}" +
-                    "},1200);})()", null);
+                    "},2000);})()", null);
             }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
                 String url = req.getUrl().toString();
                 view.loadUrl(currentMode != NAV_INCOGNITO ? applyRegion(url) : url);
-                // Re-inject ad blocker after SPA navigation (YouTube TV doesn't fire onPageFinished)
-                handler.postDelayed(() -> { injectAdBlocker(view); injectDpadNavigation(view); }, 1200);
+                // Re-inject after SPA navigation only — YouTube TV doesn't fire onPageFinished
+                handler.postDelayed(() -> { injectAdBlocker(view); injectDpadNavigation(view); }, 600);
                 return true;
             }
         });
