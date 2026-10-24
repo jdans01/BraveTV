@@ -5,8 +5,8 @@
     <dimen name="tv_margin_v">27dp</dimen>
 
     <!-- Card dimensions -->
-    <dimen name="card_height">204dp</dimen>
-    <dimen name="card_gap">12dp</dimen>
+    <dimen name="card_height">216dp</dimen>
+    <dimen name="card_gap">16dp</dimen>
     <dimen name="card_icon">64dp</dimen>
 
     <!-- Recent cards -->

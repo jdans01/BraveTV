@@ -2,7 +2,7 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0C0C14">
+    android:background="#080810">
 
     <!-- NAV BAR -->
     <LinearLayout
@@ -259,7 +259,7 @@
         android:id="@+id/homeScreen"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#0C0C14"
+        android:background="#080810"
         android:fillViewport="true">
 
         <LinearLayout
@@ -283,20 +283,20 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="BraveTV"
+                    android:text="BRAVETV"
                     android:textColor="#C084FC"
-                    android:textSize="34sp"
+                    android:textSize="48sp"
                     android:textStyle="bold"
-                    android:letterSpacing="0.04" />
+                    android:letterSpacing="0.08" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Browser"
-                    android:textColor="#9090B0"
-                    android:textSize="15sp"
-                    android:letterSpacing="0.18"
-                    android:layout_marginTop="-2dp" />
+                    android:text="BROWSER"
+                    android:textColor="#2E2E44"
+                    android:textSize="13sp"
+                    android:letterSpacing="0.28"
+                    android:layout_marginTop="2dp" />
 
             </LinearLayout>
 
@@ -378,18 +378,18 @@
                         android:layout_height="wrap_content"
                         android:text="Brave"
                         android:textColor="#F1F0FF"
-                        android:textSize="15sp"
+                        android:textSize="17sp"
                         android:textStyle="bold"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="14dp"
                         android:gravity="center" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Sin anuncios · VPN auto"
-                        android:textColor="#6B6B8A"
+                        android:textColor="#4A4A6A"
                         android:textSize="11sp"
-                        android:layout_marginTop="5dp"
+                        android:layout_marginTop="6dp"
                         android:gravity="center" />
 
                 </LinearLayout>
@@ -424,18 +424,18 @@
                         android:layout_height="wrap_content"
                         android:text="Privado"
                         android:textColor="#F1F0FF"
-                        android:textSize="15sp"
+                        android:textSize="17sp"
                         android:textStyle="bold"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="14dp"
                         android:gravity="center" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="DuckDuckGo · Incógnito"
-                        android:textColor="#6B6B8A"
+                        android:textColor="#4A4A6A"
                         android:textSize="11sp"
-                        android:layout_marginTop="5dp"
+                        android:layout_marginTop="6dp"
                         android:gravity="center" />
 
                 </LinearLayout>
@@ -470,18 +470,18 @@
                         android:layout_height="wrap_content"
                         android:text="YouTube TV"
                         android:textColor="#F1F0FF"
-                        android:textSize="15sp"
+                        android:textSize="17sp"
                         android:textStyle="bold"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="14dp"
                         android:gravity="center" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Interfaz televisión"
-                        android:textColor="#6B6B8A"
+                        android:textColor="#4A4A6A"
                         android:textSize="11sp"
-                        android:layout_marginTop="5dp"
+                        android:layout_marginTop="6dp"
                         android:gravity="center" />
 
                 </LinearLayout>
@@ -515,18 +515,18 @@
                         android:layout_height="wrap_content"
                         android:text="YouTube Web"
                         android:textColor="#F1F0FF"
-                        android:textSize="15sp"
+                        android:textSize="17sp"
                         android:textStyle="bold"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="14dp"
                         android:gravity="center" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Versión escritorio"
-                        android:textColor="#6B6B8A"
+                        android:textColor="#4A4A6A"
                         android:textSize="11sp"
-                        android:layout_marginTop="5dp"
+                        android:layout_marginTop="6dp"
                         android:gravity="center" />
 
                 </LinearLayout>
@@ -570,8 +570,9 @@
                 android:layout_gravity="center_horizontal"
                 android:layout_marginTop="28dp"
                 android:text="ATRÁS = salir  ·  Mantén VPN = elegir región"
-                android:textColor="#28283C"
-                android:textSize="11sp" />
+                android:textColor="#2E2E44"
+                android:textSize="11sp"
+                android:letterSpacing="0.08" />
 
         </LinearLayout>
     </ScrollView>

@@ -514,7 +514,7 @@ public class MainActivity extends Activity {
         down.recycle();
         up.recycle();
         // Pulse cursor to confirm click — stays visible
-        cursorDot.animate().scaleX(1.5f).scaleY(1.5f).setDuration(80)
+        cursorDot.animate().scaleX(1.4f).scaleY(1.4f).setDuration(80)
             .withEndAction(() -> cursorDot.animate().scaleX(1f).scaleY(1f).setDuration(80).start())
             .start();
     }
@@ -526,8 +526,8 @@ public class MainActivity extends Activity {
         for (int id : cardIds) {
             View card = findViewById(id);
             card.setOnFocusChangeListener((v, focused) -> {
-                ObjectAnimator sx = ObjectAnimator.ofFloat(v, "scaleX", focused ? 1.08f : 1f);
-                ObjectAnimator sy = ObjectAnimator.ofFloat(v, "scaleY", focused ? 1.08f : 1f);
+                ObjectAnimator sx = ObjectAnimator.ofFloat(v, "scaleX", focused ? 1.06f : 1f);
+                ObjectAnimator sy = ObjectAnimator.ofFloat(v, "scaleY", focused ? 1.06f : 1f);
                 ObjectAnimator tz = ObjectAnimator.ofFloat(v, "translationZ", focused ? dp(12) : 0);
                 AnimatorSet set = new AnimatorSet();
                 set.playTogether(sx, sy, tz);
