@@ -4,7 +4,8 @@
 
 **Navegador Android TV con bloqueador de anuncios, bypass de geo-restricciones y modo privado**
 
-[![Build APK](https://github.com/jdans01/blo/actions/workflows/build.yml/badge.svg)](https://github.com/jdans01/blo/actions/workflows/build.yml)
+[![Build APK](https://github.com/jdans01/BraveTV/actions/workflows/build.yml/badge.svg)](https://github.com/jdans01/BraveTV/actions/workflows/build.yml)
+[![Latest release](https://img.shields.io/github/v/release/jdans01/BraveTV)](https://github.com/jdans01/BraveTV/releases/latest)
 ![Android](https://img.shields.io/badge/Android-5.0%2B-green?logo=android)
 ![API](https://img.shields.io/badge/API-21%2B-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
@@ -59,9 +60,14 @@
 
 ### Opción A — Descarga directa (recomendado)
 
-**[⬇ BraveTVBrowser-v1.1.0.apk](releases/BraveTVBrowser-v1.1.0.apk)** — 4.1 MB · Android 5.0+
+**[⬇ Descargar BraveTVBrowser.apk (última versión)](https://github.com/jdans01/BraveTV/releases/latest/download/BraveTVBrowser.apk)** — Android 5.0+
 
-> También puedes ir a la pestaña **[Actions](../../actions/workflows/build.yml)** para descargar la última versión compilada automáticamente por CI.
+Este enlace siempre apunta a la versión más reciente publicada. También podés ver todas las
+versiones (con notas de cada una) en la pestaña **[Releases](https://github.com/jdans01/BraveTV/releases)**,
+o descargar el build de cualquier commit individual desde **[Actions](../../actions/workflows/build.yml)**.
+
+> A partir de la v2.1, la propia app avisa dentro de la pantalla de inicio cuando hay una
+> versión más nueva disponible — no hace falta volver a este enlace cada vez.
 
 ### Transferir e instalar en tu Android TV
 
@@ -137,8 +143,8 @@ adb install -r BraveTVBrowser.apk
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/jdans01/blo.git
-cd blo
+git clone https://github.com/jdans01/BraveTV.git
+cd BraveTV
 
 # Compilar APK debug
 ./gradlew assembleDebug
@@ -147,16 +153,24 @@ cd blo
 # app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### Compilar APK release (firmado con debug key)
+### Compilar APK release
 
 ```bash
 ./gradlew assembleRelease
 # app/build/outputs/apk/release/app-release.apk
 ```
 
+Sin las variables `RELEASE_KEYSTORE_PATH`/`RELEASE_KEYSTORE_PASSWORD`/`RELEASE_KEY_ALIAS`/
+`RELEASE_KEY_PASSWORD` en el entorno, cae en la llave de debug (solo para desarrollo local —
+no se puede instalar encima de una build ya firmada con la llave estable). CI sí las tiene
+configuradas como secrets del repo, así que todas las builds oficiales comparten la misma
+firma y pueden actualizarse unas sobre otras sin perder datos.
+
 ### CI/CD — GitHub Actions
 
-El workflow `.github/workflows/build.yml` compila automáticamente en cada push a `main` y publica el APK como artefacto descargable.
+El workflow `.github/workflows/build.yml` compila y firma el APK en cada push a `main`, lo
+publica como artefacto descargable, y además crea un [Release](https://github.com/jdans01/BraveTV/releases)
+con el APK adjunto cada vez que se sube un tag `vX.Y`.
 
 ---
 
