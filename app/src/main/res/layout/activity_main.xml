@@ -353,6 +353,24 @@
                     android:focusable="true"
                     android:clickable="true" />
 
+                <!-- "Lugar" fijo en el home para novedades/parches — oculto hasta el primer
+                     chequeo, "Al día" si no hay nada nuevo, o clickeable con la versión si
+                     la hay. Nunca se abre sola: actualizar es decisión de quien la usa. -->
+                <TextView
+                    android:id="@+id/homeUpdateStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="#8A8AA8"
+                    android:textSize="12sp"
+                    android:background="@drawable/chip_purple"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="7dp"
+                    android:paddingBottom="7dp"
+                    android:layout_marginStart="10dp"
+                    android:visibility="gone" />
+
             </LinearLayout>
 
             <!-- ── Cards de modo ── -->
@@ -362,7 +380,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center"
-                android:weightSum="4">
+                android:weightSum="6">
 
                 <!-- Brave Browser -->
                 <LinearLayout
@@ -508,13 +526,15 @@
                     android:layout_width="0dp"
                     android:layout_height="@dimen/card_height"
                     android:layout_weight="1"
+                    android:layout_marginEnd="@dimen/card_gap"
                     android:background="@drawable/card_mode"
                     android:orientation="vertical"
                     android:gravity="center"
                     android:padding="18dp"
                     android:focusable="true"
                     android:clickable="true"
-                    android:nextFocusLeft="@id/cardYtTv">
+                    android:nextFocusLeft="@id/cardYtTv"
+                    android:nextFocusRight="@id/cardMovies">
 
                     <TextView
                         android:layout_width="64dp"
@@ -540,6 +560,96 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Versión escritorio"
+                        android:textColor="#6B6B8A"
+                        android:textSize="11sp"
+                        android:layout_marginTop="5dp"
+                        android:gravity="center" />
+
+                </LinearLayout>
+
+                <!-- Películas -->
+                <LinearLayout
+                    android:id="@+id/cardMovies"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/card_height"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="@dimen/card_gap"
+                    android:background="@drawable/card_mode"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="18dp"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusLeft="@id/cardYtWeb"
+                    android:nextFocusRight="@id/cardAnime">
+
+                    <TextView
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:background="@drawable/icon_movies_circle"
+                        android:text="&#127916;"
+                        android:textColor="#FFFFFF"
+                        android:textSize="24sp"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Películas"
+                        android:textColor="#F1F0FF"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Cuevana"
+                        android:textColor="#6B6B8A"
+                        android:textSize="11sp"
+                        android:layout_marginTop="5dp"
+                        android:gravity="center" />
+
+                </LinearLayout>
+
+                <!-- Anime -->
+                <LinearLayout
+                    android:id="@+id/cardAnime"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/card_height"
+                    android:layout_weight="1"
+                    android:background="@drawable/card_mode"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="18dp"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusLeft="@id/cardMovies">
+
+                    <TextView
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:background="@drawable/icon_anime_circle"
+                        android:text="&#127884;"
+                        android:textColor="#FFFFFF"
+                        android:textSize="26sp"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Anime"
+                        android:textColor="#F1F0FF"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="AnimeFLV"
                         android:textColor="#6B6B8A"
                         android:textSize="11sp"
                         android:layout_marginTop="5dp"

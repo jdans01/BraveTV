@@ -55,6 +55,8 @@ public class MainActivity extends Activity {
     private static final int NAV_INCOGNITO = 1;
     private static final int NAV_YT_TV    = 2;
     private static final int NAV_YT_WEB   = 3;
+    private static final int NAV_MOVIES   = 4;
+    private static final int NAV_ANIME    = 5;
 
     private int currentMode = NAV_BRAVE;
 
@@ -67,6 +69,7 @@ public class MainActivity extends Activity {
     private ScrollView homeScreen;
     private TextView homeVpnStatus;
     private TextView homeQuality;
+    private TextView homeUpdateStatus;
     private LinearLayout recentsList;
     private SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -323,6 +326,12 @@ public class MainActivity extends Activity {
         try { return Integer.parseInt(s.replaceAll("[^0-9]", "")); } catch (Exception e) { return 0; }
     }
 
+    // Result of the last check, read by the home-screen chip and its click handler —
+    // nothing here pops a dialog on its own. The update is only ever downloaded/installed
+    // when the person taps the chip themselves (see updateHomeUpdateStatus/onClick below).
+    private String pendingUpdateVersion;
+    private String pendingUpdateApkUrl;
+
     private void checkForUpdate() {
         if (System.currentTimeMillis() - prefs.getLong(PREF_UPDATE_CHECK_TIME, 0) < UPDATE_CHECK_TTL_MS)
             return;
@@ -360,18 +369,50 @@ public class MainActivity extends Activity {
                 }
                 if (apkUrl == null) return;
                 String finalUrl = apkUrl, finalLatest = latest;
-                handler.post(() -> showUpdateDialog(finalLatest, finalUrl));
+                handler.post(() -> {
+                    pendingUpdateVersion = finalLatest;
+                    pendingUpdateApkUrl = finalUrl;
+                    updateHomeUpdateStatus();
+                });
             } catch (Exception ignored) {}
         });
     }
 
-    private void showUpdateDialog(String version, String apkUrl) {
+    // The one persistent "place" on the home screen for update/patch status — chip starts
+    // hidden (nothing to say until the first check lands), reads "✅ Al día" once checked
+    // with nothing newer, or "⬆️ vX.Y disponible" when there's something to install. Only
+    // the second state is clickable; tapping it is what makes downloading voluntary rather
+    // than something sprung on the person automatically.
+    private void updateHomeUpdateStatus() {
+        if (homeUpdateStatus == null) return;
+        if (pendingUpdateVersion != null) {
+            homeUpdateStatus.setText("⬆️ v" + pendingUpdateVersion + " disponible");
+            homeUpdateStatus.setBackgroundResource(R.drawable.chip_green);
+            homeUpdateStatus.setTextColor(0xFF4ADE80);
+            homeUpdateStatus.setFocusable(true);
+            homeUpdateStatus.setClickable(true);
+            homeUpdateStatus.setVisibility(View.VISIBLE);
+        } else if (prefs.getLong(PREF_UPDATE_CHECK_TIME, 0) > 0) {
+            homeUpdateStatus.setText("✅ Al día");
+            homeUpdateStatus.setBackgroundResource(R.drawable.chip_purple);
+            homeUpdateStatus.setTextColor(0xFF8A8AA8);
+            homeUpdateStatus.setFocusable(false);
+            homeUpdateStatus.setClickable(false);
+            homeUpdateStatus.setVisibility(View.VISIBLE);
+        } else {
+            homeUpdateStatus.setVisibility(View.GONE);
+        }
+    }
+
+    private void onUpdateChipClick() {
+        if (pendingUpdateVersion == null || pendingUpdateApkUrl == null) return;
         new android.app.AlertDialog.Builder(this)
-            .setTitle("🦁 Nueva versión disponible")
-            .setMessage("BraveTV Browser v" + version + " está disponible (tenés v"
-                + BuildConfig.VERSION_NAME + "). ¿Actualizar ahora?")
-            .setPositiveButton("Actualizar", (d, w) -> startUpdateDownload(apkUrl, version))
-            .setNegativeButton("Más tarde", null)
+            .setTitle("🦁 Actualizar BraveTV")
+            .setMessage("Versión v" + pendingUpdateVersion + " disponible (tenés v"
+                + BuildConfig.VERSION_NAME + "). ¿Descargar e instalar ahora?")
+            .setPositiveButton("Actualizar", (d, w) ->
+                startUpdateDownload(pendingUpdateApkUrl, pendingUpdateVersion))
+            .setNegativeButton("Cancelar", null)
             .show();
     }
 
@@ -699,6 +740,8 @@ public class MainActivity extends Activity {
         homeVpnStatus  = findViewById(R.id.homeVpnStatus);
         homeQuality    = findViewById(R.id.homeQuality);
         if (homeQuality != null) homeQuality.setOnClickListener(v -> showQualityDialog());
+        homeUpdateStatus = findViewById(R.id.homeUpdateStatus);
+        if (homeUpdateStatus != null) homeUpdateStatus.setOnClickListener(v -> onUpdateChipClick());
         recentsList    = findViewById(R.id.recentsList);
         btnBlockCount  = findViewById(R.id.btnBlockCount);
         homeBlockCount = findViewById(R.id.homeBlockCount);
@@ -715,6 +758,7 @@ public class MainActivity extends Activity {
         regionIndex    = prefs.getInt("regionIdx", 0);
         videoQualityCap = prefs.getString("videoQualityCap", "auto");
         updateHomeQualityLabel();
+        updateHomeUpdateStatus();
         initBlocklist(); // seed built-in + load cached remote list
         checkForUpdate();
 
@@ -787,7 +831,8 @@ public class MainActivity extends Activity {
     // ─── Card focus animations ────────────────────────────────────────────────
     private void setupCardFocusAnimations() {
         DecelerateInterpolator interp = new DecelerateInterpolator(1.5f);
-        int[] cardIds = {R.id.cardBrave, R.id.cardTor, R.id.cardYtTv, R.id.cardYtWeb};
+        int[] cardIds = {R.id.cardBrave, R.id.cardTor, R.id.cardYtTv, R.id.cardYtWeb,
+            R.id.cardMovies, R.id.cardAnime};
         for (int id : cardIds) {
             View card = findViewById(id);
             card.setOnFocusChangeListener((v, focused) -> {
@@ -869,6 +914,12 @@ public class MainActivity extends Activity {
                     ? "https://www.youtube.com/?gl=" + AUTO_REGIONS[regionIndex] + "&hl=es"
                     : "https://www.youtube.com/";
                 break;
+            case NAV_MOVIES:
+                url = "https://ccuevana3.wtf/inicio";
+                break;
+            case NAV_ANIME:
+                url = "https://animeflv.or.at";
+                break;
             default:
                 url = "https://search.brave.com/";
                 break;
@@ -909,7 +960,7 @@ public class MainActivity extends Activity {
         CookieManager.getInstance().flush();
     }
 
-    // ─── YouTube ad-data stripping (JSON.parse patch, à la TizenTube) ────────
+    // ─── YouTube ad-data stripping (JSON.parse patch) ────────────────────────
     // injectAdBlocker's CSS/skip-loop hides or fast-forwards an ad *after* YouTube's
     // player has already been told one exists — which is why a gray placeholder frame
     // shows up for the brief moment before our JS catches up. YouTube TV/Web decide
@@ -1110,6 +1161,26 @@ public class MainActivity extends Activity {
             // Loop: skip botón, fast-forward, dismiss interstitial
             "var _btvStallTicks=0,_btvLastTime=-1;" +
             "setInterval(function(){" +
+            // Catches switching to a new video no matter HOW the navigation happened —
+            // onPageStarted/shouldOverrideUrlLoading on the Android side only fire for
+            // real top-level page loads, but YouTube TV mostly moves between videos via
+            // its own client-side router (history.pushState), which never triggers those.
+            // That's the gap that let the gray loading screen through even after priming
+            // the shield from Java: this is what actually catches every video change, by
+            // polling location.href itself instead of relying on Android to tell us.
+            "  var _vidNow=(location.href.match(/(?:[?&]v=|youtu\\.be\\/)([A-Za-z0-9_-]{11})/)||[])[1];" +
+            "  if(_vidNow&&_vidNow!==window._btvCurVid){" +
+            "    window._btvCurVid=_vidNow;" +
+            "    var sh0=document.getElementById('_btv_shield');" +
+            "    if(sh0){" +
+            "      sh0.classList.add('on');" +
+            "      sh0.style.backgroundImage='linear-gradient(rgba(8,4,16,.6),rgba(8,4,16,.8))," +
+            "url(\"https://i.ytimg.com/vi/'+_vidNow+'/hqdefault.jpg\")';" +
+            "      var sm0=document.getElementById('_btv_shield_msg');" +
+            "      if(sm0)sm0.textContent='Cargando\\u2026';" +
+            "    }" +
+            "    window._btvPendingPlay=true;window._btvPendingPlayAt=Date.now();" +
+            "  }" +
             "  var sk=document.querySelector(" +
             "    '.ytp-ad-skip-button,.ytp-skip-ad-button,.ytp-ad-skip-button-modern," +
             "     .ytp-ad-skip-button-slot button,ytlr-skip-button-renderer button," +
@@ -1572,6 +1643,8 @@ public class MainActivity extends Activity {
         findViewById(R.id.cardTor).setOnClickListener(v -> launchMode(NAV_INCOGNITO));
         findViewById(R.id.cardYtTv).setOnClickListener(v -> launchMode(NAV_YT_TV));
         findViewById(R.id.cardYtWeb).setOnClickListener(v -> launchMode(NAV_YT_WEB));
+        findViewById(R.id.cardMovies).setOnClickListener(v -> launchMode(NAV_MOVIES));
+        findViewById(R.id.cardAnime).setOnClickListener(v -> launchMode(NAV_ANIME));
 
         findViewById(R.id.btnYoutube).setOnClickListener(v ->
             loadUrl(currentMode == NAV_YT_WEB
@@ -1637,7 +1710,9 @@ public class MainActivity extends Activity {
         switch (currentMode) {
             case NAV_BRAVE:     hint = "Buscar en Brave Search...";   title = "🔍 Brave Search";   break;
             case NAV_INCOGNITO: hint = "Buscar en DuckDuckGo...";     title = "🔒 DuckDuckGo";     break;
-            default:            hint = "Buscar en YouTube...";        title = "🔍 Buscar YouTube";  break;
+            case NAV_YT_TV: case NAV_YT_WEB:
+                                hint = "Buscar en YouTube...";        title = "🔍 Buscar YouTube";  break;
+            default:            hint = "Buscar en Brave Search...";   title = "🔍 Brave Search";   break;
         }
 
         final EditText input = new EditText(this);
@@ -1673,8 +1748,12 @@ public class MainActivity extends Activity {
             case NAV_INCOGNITO:
                 url = "https://duckduckgo.com/?q=" + Uri.encode(query);
                 break;
-            default:
+            case NAV_YT_TV:
+            case NAV_YT_WEB:
                 url = applyRegion("https://www.youtube.com/results?search_query=" + Uri.encode(query));
+                break;
+            default:
+                url = "https://search.brave.com/search?q=" + Uri.encode(query);
                 break;
         }
         loadUrl(url);
