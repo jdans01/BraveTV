@@ -46,7 +46,7 @@
             android:paddingStart="10dp"
             android:paddingEnd="10dp"
             android:singleLine="true"
-            android:imeOptions="actionGo"
+            android:imeOptions="actionSearch"
             android:inputType="text"
             android:focusable="true"
             android:nextFocusLeft="@id/btnSearch"
@@ -68,7 +68,7 @@
             android:layout_marginEnd="3dp"
             android:focusable="false" />
 
-        <!-- VPN -->
+        <!-- Región (NO es una VPN real: solo cambia gl/hl y la cookie PREF de YouTube) -->
         <Button
             android:id="@+id/btnVpn"
             android:layout_width="wrap_content"
@@ -225,7 +225,7 @@
         android:layout_width="28dp"
         android:layout_height="32dp"
         android:src="@drawable/cursor_arrow"
-        android:elevation="20dp"
+        android:elevation="24dp"
         android:visibility="gone" />
 
     <TextView
@@ -246,8 +246,9 @@
         android:layout_width="wrap_content"
         android:layout_height="32dp"
         android:layout_alignParentTop="true"
-        android:layout_centerHorizontal="true"
+        android:layout_alignParentEnd="true"
         android:layout_marginTop="0dp"
+        android:layout_marginEnd="12dp"
         android:text="▼ Menú"
         android:textColor="#CCFFFFFF"
         android:textSize="11sp"
@@ -330,7 +331,7 @@
                     android:id="@+id/homeVpnStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="&#127758; VPN AUTO · EE.UU."
+                    android:text="&#127758; REGIÓN AUTO · EE.UU."
                     android:textColor="#4ADE80"
                     android:textSize="12sp"
                     android:background="@drawable/chip_green"
@@ -436,7 +437,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Sin anuncios · VPN auto"
+                        android:text="Sin anuncios · región auto"
                         android:textColor="#6B6B8A"
                         android:textSize="11sp"
                         android:layout_marginTop="5dp"
@@ -575,9 +576,10 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Versión escritorio"
-                        android:textColor="#6B6B8A"
+                        android:text="HD y hasta 4K · máxima disponible"
+                        android:textColor="#C4A7FF"
                         android:textSize="11sp"
+                        android:textStyle="bold"
                         android:layout_marginTop="5dp"
                         android:gravity="center" />
 
@@ -675,6 +677,109 @@
 
             </LinearLayout>
 
+            <!-- ── Centro de beneficios ── -->
+            <LinearLayout
+                android:id="@+id/benefitsSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="34dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="CENTRO DE BENEFICIOS"
+                            android:textColor="#C084FC"
+                            android:textSize="18sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.06" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="Servicios y ofertas con condiciones visibles"
+                            android:textColor="#8E8EA8"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/btnBenefitsManage"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:background="@drawable/btn_cursor"
+                        android:focusable="true"
+                        android:clickable="true"
+                        android:text="Administrar"
+                        android:textColor="#F1F0FF"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/benefitsAdminTools"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <Button
+                        android:id="@+id/btnBenefitsAdd"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/btn_cursor"
+                        android:focusable="true"
+                        android:clickable="true"
+                        android:text="+ Añadir servicio"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnBenefitsImport"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/btn_cursor"
+                        android:focusable="true"
+                        android:clickable="true"
+                        android:text="Importar JSON"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnBenefitsExport"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:background="@drawable/btn_cursor"
+                        android:focusable="true"
+                        android:clickable="true"
+                        android:text="Exportar JSON"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/benefitsRows"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
             <!-- ── Favoritos — oculta si no hay ninguno guardado ── -->
             <LinearLayout
                 android:id="@+id/favoritesSection"
@@ -750,11 +855,31 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
                 android:layout_marginTop="28dp"
-                android:text="ATRÁS = salir  ·  Mantén VPN = elegir región  ·  OK en Calidad = ajustar resolución  ·  ★ = guardar página"
+                android:text="ATRÁS = salir  ·  Mantén Región = elegir región  ·  OK en Calidad = ajustar resolución  ·  ★ = guardar página"
                 android:textColor="#28283C"
                 android:textSize="11sp" />
 
         </LinearLayout>
     </ScrollView>
+
+    <!-- Cursor rápido, disponible aunque la barra del navegador esté escondida. -->
+    <TextView
+        android:id="@+id/btnCursorFloat"
+        android:layout_width="112dp"
+        android:layout_height="40dp"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="108dp"
+        android:background="@drawable/btn_cursor"
+        android:elevation="22dp"
+        android:focusable="true"
+        android:clickable="true"
+        android:gravity="center"
+        android:text="🖱 Cursor OFF"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 
 </RelativeLayout>

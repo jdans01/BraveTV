@@ -1,4 +1,4 @@
-## 🦁 BraveTV Browser v2.1
+## 🦁 BraveTV Browser v2.2
 
 Navegador para Android TV con bloqueador de anuncios integrado, bypass de geo-restricciones y modo privado.
 
@@ -15,6 +15,20 @@ Navegador para Android TV con bloqueador de anuncios integrado, bypass de geo-re
 > aviso de actualización dentro de la propia app — no hace falta volver a descargar a mano.
 
 ---
+
+### ✨ Novedades v2.2
+
+- **Modo cursor para TV**: el menú permanece oculto mientras navegas, el cursor se puede alternar
+  desde el mando con `MENÚ` y la búsqueda recupera el estado de cursor que eligió la persona.
+- **YouTube TV**: las flechas mantienen el desplazamiento de sus filas y el cursor acompaña la
+  navegación; la búsqueda abre el teclado en pantalla.
+- **YouTube Web en HD/4K**: calidad automática hasta la resolución máxima disponible, con selector
+  para limitarla según la capacidad de la TV.
+- **Búsqueda y URL**: el teclado muestra la acción Buscar, y enfocar o pasar por la barra URL no la
+  edita; se requiere una selección/clic explícito.
+- **Navegación en sitios web**: el scroll por cursor alcanza contenedores desplazables internos.
+- Se actualizó el bloqueo general y su proceso de generación para conservar la última lista válida
+  si falla la descarga de las fuentes.
 
 ### ✨ Novedades v2.1
 

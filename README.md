@@ -34,7 +34,7 @@
 ### 🏠 Pantalla de inicio
 | Modo | Descripción |
 |------|-------------|
-| **Brave Browser** | Abre `search.brave.com` — buscador enfocado en privacidad |
+| **Brave Browser** | Abre `brave.com/search/`; las consultas van a `search.brave.com` |
 | **Brave Privado** | Abre `duckduckgo.com` en modo incógnito (sin cookies ni historial) |
 | **YouTube TV** | YouTube optimizado para pantalla grande con user-agent de Smart TV |
 | **YouTube Web** | YouTube versión escritorio con Chrome user-agent |
@@ -42,6 +42,8 @@
 ### 📺 Optimizado para Android TV
 - Navegación completa por **D-pad** (mando a distancia)
 - Scroll con flechas arriba/abajo en páginas web
+- Cursor alternable con la tecla **MENÚ** del control remoto
+- YouTube Web con selección automática hasta HD/4K, según la calidad disponible
 - **Pantalla completa automática** durante reproducción de video
 - Barra de navegación se **oculta automáticamente** en modo fullscreen
 - Compatible con: **Hisense · TCL · Sony · Philips · Mi Box · NVIDIA Shield** y cualquier Android TV
@@ -127,7 +129,7 @@ adb install -r BraveTVBrowser.apk
 | Pantalla de inicio | Brave Search | YouTube TV |
 |:-:|:-:|:-:|
 | ![Home](docs/screenshots/home.jpg) | ![Brave Search](docs/screenshots/brave_search.jpg) | ![YouTube TV](docs/screenshots/youtube_tv.jpg) |
-| 4 modos · contador de bloqueos · VPN status | search.brave.com · 38 anuncios bloqueados | YouTube TV optimizado para pantalla grande |
+| 4 modos · contador de bloqueos · VPN status | brave.com/search · 38 anuncios bloqueados | YouTube TV optimizado para pantalla grande |
 
 ---
 

@@ -1,0 +1,14 @@
+[
+  {"category":"privacy","name":"Brave","description":"Navegador con bloqueo de anuncios y rastreadores.","url":"https://brave.com/download/","free":true,"subscription":false,"purchase":false,"affiliate":false,"affiliateUrl":""},
+  {"category":"privacy","name":"Proton VPN","description":"VPN con plan gratuito y opciones de pago.","url":"https://protonvpn.com/free-vpn","free":true,"subscription":true,"purchase":false,"affiliate":false,"affiliateUrl":""},
+  {"category":"privacy","name":"Bitwarden","description":"Gestor de contraseñas con plan personal gratis.","url":"https://bitwarden.com/pricing/","free":true,"subscription":true,"purchase":false,"affiliate":false,"affiliateUrl":""},
+  {"category":"privacy","name":"Signal","description":"Mensajería privada gratuita, sin anuncios ni afiliación.","url":"https://signal.org/es/","free":true,"subscription":false,"purchase":false,"affiliate":false,"affiliateUrl":""},
+  {"category":"entertainment","name":"YouTube","description":"Videos gratis; Premium es opcional y requiere suscripción.","url":"https://www.youtube.com/","free":true,"subscription":true,"purchase":false,"affiliate":false,"affiliateUrl":""},
+  {"category":"entertainment","name":"Pluto TV","description":"Canales y películas gratis con anuncios.","url":"https://pluto.tv/","free":true,"subscription":false,"purchase":false,"affiliate":false,"affiliateUrl":""},
+  {"category":"entertainment","name":"Spotify","description":"Plan gratis con anuncios y opciones Premium.","url":"https://www.spotify.com/mx/premium/","free":true,"subscription":true,"purchase":false,"affiliate":false,"affiliateUrl":""},
+  {"category":"entertainment","name":"Netflix","description":"Servicio de streaming con planes de suscripción.","url":"https://www.netflix.com/","free":false,"subscription":true,"purchase":false,"affiliate":false,"affiliateUrl":""},
+  {"category":"ai","name":"ChatGPT","description":"IA con acceso gratuito y planes de pago opcionales.","url":"https://chatgpt.com/","free":true,"subscription":true,"purchase":false,"affiliate":false,"affiliateUrl":""},
+  {"category":"ai","name":"Google Gemini","description":"Asistente de IA con acceso gratis y planes Google AI.","url":"https://gemini.google.com/","free":true,"subscription":true,"purchase":false,"affiliate":false,"affiliateUrl":""},
+  {"category":"ai","name":"Canva","description":"Diseño y productividad con plan gratis y planes de pago.","url":"https://www.canva.com/pricing/","free":true,"subscription":true,"purchase":false,"affiliate":false,"affiliateUrl":""},
+  {"category":"offers","name":"Accesorios para streaming","description":"Explora controles, adaptadores y dispositivos para TV.","url":"https://www.amazon.com.mx/s?k=accesorios+para+streaming","free":false,"subscription":false,"purchase":true,"affiliate":false,"affiliateUrl":""}
+]

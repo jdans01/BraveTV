@@ -19,6 +19,8 @@ Corre semanalmente vía GitHub Actions.
 import urllib.request
 import re
 import sys
+import os
+import tempfile
 from datetime import datetime, timezone
 
 # ── Fuentes públicas ──────────────────────────────────────────────────────────
@@ -105,6 +107,27 @@ def extract_hosts(content: str, keywords: list) -> set:
     return hosts
 
 
+def extract_host_paths(content: str, keywords: list) -> set:
+    """Keep simple domain-anchored path rules without resource/domain options.
+
+    They are more precise than converting ||host/path^ to a host-wide block. Rules
+    with wildcards, regexes, exceptions, or $options are intentionally left out.
+    """
+    paths = set()
+    rule_re = re.compile(
+        r"^\|\|([a-zA-Z0-9.\-]+)/([a-zA-Z0-9._~!$&'()+,;=:@%/-]+)\^$"
+    )
+    for raw in content.splitlines():
+        line = raw.strip()
+        match = rule_re.match(line)
+        if not match:
+            continue
+        host, path = match.group(1).lower(), "/" + match.group(2)
+        if _relevant(host, keywords) and _safe(host):
+            paths.add(host + path)
+    return paths
+
+
 def _relevant(host: str, keywords) -> bool:
     if not keywords:   # source already curated for ads/trackers — nothing to filter by
         return True
@@ -127,7 +150,7 @@ def _safe(host: str) -> bool:
 
 def read_manual_entries(path: str):
     """Lee las entradas manuales (con # Manual o al inicio del archivo hasta el primer bloque auto)."""
-    hosts, patterns, header_lines = set(), set(), []
+    hosts, patterns, host_paths, header_lines = set(), set(), set(), []
     in_auto = False
     with open(path) as f:
         for line in f:
@@ -140,52 +163,88 @@ def read_manual_entries(path: str):
                 hosts.add(stripped[5:].strip())
             elif stripped.startswith("PATTERN:"):
                 patterns.add(stripped[8:].strip())
-    return hosts, patterns, header_lines
+            elif stripped.startswith("HOSTPATH:"):
+                host_paths.add(stripped[9:].strip())
+    return hosts, patterns, host_paths, header_lines
 
 
 def write_blocklist(path: str, manual_hosts: set, manual_patterns: set,
-                    header_lines: list, auto_hosts: set):
+                    manual_host_paths: set, header_lines: list,
+                    auto_hosts: set, auto_host_paths: set):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    with open(path, "w") as f:
-        # Cabecera manual preservada
-        for line in header_lines:
-            f.write(line + "\n")
+    new_hosts = sorted(auto_hosts - manual_hosts)
+    new_host_paths = sorted(auto_host_paths - manual_host_paths)
+    directory = os.path.dirname(os.path.abspath(path))
+    fd, temp_path = tempfile.mkstemp(prefix=".blocklist-", suffix=".tmp", dir=directory)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            # Cabecera manual preservada
+            for line in header_lines:
+                f.write(line + "\n")
 
-        # Separador bloque automático
-        f.write("\n")
-        f.write("# ════════════════════════════════════════════════════════════\n")
-        f.write(f"# AUTO-GENERATED — {today} — no editar esta sección manualmente\n")
-        f.write(f"# Fuentes: uBlock Origin, AdGuard Mobile Ads, EasyPrivacy, HaGeZi Light, HaGeZi Pop-Up Ads\n")
-        f.write("# ════════════════════════════════════════════════════════════\n")
+            # Separador bloque automático
+            f.write("\n")
+            f.write("# ════════════════════════════════════════════════════════════\n")
+            f.write(f"# AUTO-GENERATED — {today} — no editar esta sección manualmente\n")
+            f.write("# Fuentes: uBlock Origin, AdGuard Mobile Ads, EasyPrivacy, HaGeZi Light, HaGeZi Pop-Up Ads\n")
+            f.write("# ════════════════════════════════════════════════════════════\n")
 
-        # Hosts automáticos (excluye los que ya están en la sección manual)
-        new_hosts = sorted(auto_hosts - manual_hosts)
-        if new_hosts:
-            f.write(f"\n# {len(new_hosts)} dominios de fuentes públicas\n")
-            for h in new_hosts:
-                f.write(f"HOST:{h}\n")
+            # Hosts automáticos (excluye los que ya están en la sección manual)
+            if new_hosts:
+                f.write(f"\n# {len(new_hosts)} dominios de fuentes públicas\n")
+                for h in new_hosts:
+                    f.write(f"HOST:{h}\n")
+            if new_host_paths:
+                f.write(f"\n# {len(new_host_paths)} rutas específicas de anuncios/rastreadores\n")
+                for rule in new_host_paths:
+                    f.write(f"HOSTPATH:{rule}\n")
+            f.flush()
+            os.fsync(f.fileno())
+        # No deja blocklist.txt truncada si el proceso falla mientras escribe.
+        os.replace(temp_path, path)
+    except Exception:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
 
     print(f"✓ blocklist.txt actualizado — {len(manual_hosts)} manuales + {len(new_hosts)} automáticos")
 
 
 def main():
     path = "blocklist.txt"
-    manual_hosts, manual_patterns, header_lines = read_manual_entries(path)
+    manual_hosts, manual_patterns, manual_host_paths, header_lines = read_manual_entries(path)
     print(f"  Entradas manuales: {len(manual_hosts)} hosts, {len(manual_patterns)} patrones")
 
     auto_hosts = set()
+    auto_host_paths = set()
+    successful_sources = set()
     for source in SOURCES:
         try:
             print(f"  Descargando: {source['name']} …")
             content = fetch(source["url"])
             found = extract_hosts(content, source["keywords"])
+            found_paths = extract_host_paths(content, source["keywords"])
             print(f"    → {len(found)} dominios relevantes")
+            print(f"    → {len(found_paths)} rutas específicas relevantes")
             auto_hosts.update(found)
+            auto_host_paths.update(found_paths)
+            successful_sources.add(source["name"])
         except Exception as e:
             print(f"    ✗ Error: {e}", file=sys.stderr)
 
     print(f"  Total automáticos únicos: {len(auto_hosts)}")
-    write_blocklist(path, manual_hosts, manual_patterns, header_lines, auto_hosts)
+    broad_sources = {
+        "HaGeZi Multi LIGHT (anuncios/rastreadores general)",
+        "HaGeZi Pop-Up Ads",
+    }
+    if not (successful_sources & broad_sources) or len(auto_hosts) < 10000:
+        print("✗ No se reemplaza blocklist.txt: faltaron listas generales o el resultado "
+              "es demasiado pequeño; se conserva la última lista completa.", file=sys.stderr)
+        raise SystemExit(1)
+    write_blocklist(path, manual_hosts, manual_patterns, manual_host_paths,
+                    header_lines, auto_hosts, auto_host_paths)
 
 
 if __name__ == "__main__":

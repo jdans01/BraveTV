@@ -10,8 +10,8 @@ android {
         applicationId "com.bravetv.browser"
         minSdk 21
         targetSdk 34
-        versionCode 3
-        versionName "2.1"
+        versionCode 4
+        versionName "2.2"
     }
 
     // Release builds need a STABLE signature across runs for in-app updates to work at
